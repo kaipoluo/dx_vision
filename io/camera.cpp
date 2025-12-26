@@ -4,6 +4,8 @@
 
 #include "hikrobot/hikrobot.hpp"
 #include "mindvision/mindvision.hpp"
+#include "dahengvision/dahengvision.hpp"
+
 #include "tools/yaml.hpp"
 
 namespace io
@@ -25,7 +27,7 @@ Camera::Camera(const std::string & config_path)
     auto vid_pid = tools::read<std::string>(yaml, "vid_pid");
     camera_ = std::make_unique<HikRobot>(exposure_ms, gain, vid_pid);
   }
-  
+
   else if (camera_name == "dahengvision") {
     auto gamma = tools::read<double>(yaml, "gamma");
     auto vid_pid = tools::read<std::string>(yaml, "vid_pid");
