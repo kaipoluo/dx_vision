@@ -14,6 +14,10 @@ Gimbal::Gimbal(const std::string & config_path)
 
   try {
     serial_.setPort(com_port);
+    // 设置串口参数，确保与设备匹配
+    serial_.setBaudrate(115200); // 根据实际设备调整
+    serial::Timeout timeout = serial::Timeout::simpleTimeout(100);
+    serial_.setTimeout(timeout);
     serial_.open();
   } catch (const std::exception & e) {
     tools::logger()->error("[Gimbal] Failed to open serial: {}", e.what());
@@ -22,8 +26,7 @@ Gimbal::Gimbal(const std::string & config_path)
 
   thread_ = std::thread(&Gimbal::read_thread, this);
 
-  queue_.pop();
-  tools::logger()->info("[Gimbal] First q received.");
+  tools::logger()->info("[Gimbal] Initialized successfully.");
 }
 
 Gimbal::~Gimbal()
@@ -63,18 +66,11 @@ std::string Gimbal::str(GimbalMode mode) const
 
 Eigen::Quaterniond Gimbal::q(std::chrono::steady_clock::time_point t)
 {
-  while (true) {
-    auto [q_a, t_a] = queue_.pop();
-    auto [q_b, t_b] = queue_.front();
-    auto t_ab = tools::delta_time(t_a, t_b);
-    auto t_ac = tools::delta_time(t_a, t);
-    auto k = t_ac / t_ab;
-    Eigen::Quaterniond q_c = q_a.slerp(k, q_b).normalized();
-    if (t < t_a) return q_c;
-    if (!(t_a < t && t <= t_b)) continue;
-
-    return q_c;
-  }
+  std::lock_guard<std::mutex> lock(mutex_);
+  // 从yaw和pitch创建四元数（Z-Y-X旋转顺序）
+  Eigen::Quaterniond q = Eigen::AngleAxisd(state_.yaw, Eigen::Vector3d::UnitZ()) *
+                        Eigen::AngleAxisd(state_.pitch, Eigen::Vector3d::UnitY());
+  return q.normalized();
 }
 
 void Gimbal::send(io::VisionToGimbal VisionToGimbal)
@@ -86,6 +82,7 @@ void Gimbal::send(io::VisionToGimbal VisionToGimbal)
   tx_data_.pitch = VisionToGimbal.pitch;
   tx_data_.pitch_vel = VisionToGimbal.pitch_vel;
   tx_data_.pitch_acc = VisionToGimbal.pitch_acc;
+  tx_data_.shoot = VisionToGimbal.shoot;
   tx_data_.crc16 = tools::get_crc16(
     reinterpret_cast<uint8_t *>(&tx_data_), sizeof(tx_data_) - sizeof(tx_data_.crc16));
 
@@ -145,7 +142,10 @@ void Gimbal::read_thread()
       continue;
     }
 
-    if (rx_data_.head[0] != 'S' || rx_data_.head[1] != 'P') continue;
+    if (rx_data_.head[0] != 'S' || rx_data_.head[1] != 'P') {
+      error_count++;  // 这里需要增加错误计数，否则帧头不匹配时不会增加计数
+      continue;
+    }
 
     auto t = std::chrono::steady_clock::now();
 
@@ -156,25 +156,34 @@ void Gimbal::read_thread()
       continue;
     }
 
+    // 直接从packed结构体复制值到临时变量，避免绑定问题
+    uint16_t temp_crc16 = rx_data_.crc16;
     if (!tools::check_crc16(reinterpret_cast<uint8_t *>(&rx_data_), sizeof(rx_data_))) {
-      tools::logger()->debug("[Gimbal] CRC16 check failed.");
+      tools::logger()->debug("[Gimbal] CRC16 check failed.RX:{}", temp_crc16);
+      error_count++;
       continue;
     }
 
     error_count = 0;
-    Eigen::Quaterniond q(rx_data_.q[0], rx_data_.q[1], rx_data_.q[2], rx_data_.q[3]);
-    queue_.push({q, t});
-
+    // 直接从packed结构体复制值到临时变量
+    float temp_yaw = rx_data_.yaw;
+    float temp_pitch = rx_data_.pitch;
+    float temp_yaw_vel = rx_data_.yaw_vel;
+    float temp_pitch_vel = rx_data_.pitch_vel;
+    float temp_bullet_speed = rx_data_.bullet_speed;
+    uint8_t temp_mode = rx_data_.mode;
+    
     std::lock_guard<std::mutex> lock(mutex_);
 
-    state_.yaw = rx_data_.yaw;
-    state_.yaw_vel = rx_data_.yaw_vel;
-    state_.pitch = rx_data_.pitch;
-    state_.pitch_vel = rx_data_.pitch_vel;
-    state_.bullet_speed = rx_data_.bullet_speed;
-    state_.bullet_count = rx_data_.bullet_count;
+    // 使用临时变量赋值
+    state_.yaw = temp_yaw;
+    state_.yaw_vel = temp_yaw_vel;
+    state_.pitch = temp_pitch;
+    state_.pitch_vel = temp_pitch_vel;
+    state_.bullet_speed = temp_bullet_speed;
+    // 删除弹丸剩余量
 
-    switch (rx_data_.mode) {
+    switch (temp_mode) {
       case 0:
         mode_ = GimbalMode::IDLE;
         break;
@@ -189,9 +198,14 @@ void Gimbal::read_thread()
         break;
       default:
         mode_ = GimbalMode::IDLE;
-        tools::logger()->warn("[Gimbal] Invalid mode: {}", rx_data_.mode);
+        tools::logger()->warn("[Gimbal] Invalid mode: {}", temp_mode);
         break;
     }
+  
+    // // 打印接收云台信息
+    // tools::logger()->debug("[Gimbal] Data received successfully. Mode: {}, Yaw: {:.2f}, Pitch: {:.2f},CRC: {}",
+    //                        static_cast<int>(temp_mode), temp_yaw * 57.3, temp_pitch * 57.3, temp_crc16);
+    
   }
 
   tools::logger()->info("[Gimbal] read_thread stopped.");
@@ -201,7 +215,7 @@ void Gimbal::reconnect()
 {
   int max_retry_count = 10;
   for (int i = 0; i < max_retry_count && !quit_; ++i) {
-    tools::logger()->warn("[Gimbal] Reconnecting serial, attempt {}/{}...", i + 1, max_retry_count);
+    tools::logger()->warn("[Gimbal] Reconnecting serial, attempt {}/{}", i + 1, max_retry_count);
     try {
       serial_.close();
       std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -210,7 +224,6 @@ void Gimbal::reconnect()
 
     try {
       serial_.open();  // 尝试重新打开
-      queue_.clear();
       tools::logger()->info("[Gimbal] Reconnected serial successfully.");
       break;
     } catch (const std::exception & e) {

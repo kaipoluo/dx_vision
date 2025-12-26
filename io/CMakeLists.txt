@@ -8,7 +8,6 @@ add_subdirectory(serial)
 add_library(io STATIC 
     hikrobot/hikrobot.cpp    
     mindvision/mindvision.cpp  
-    dahengvision/dahengvision.cpp
     usbcamera/usbcamera.cpp  
     camera.cpp
     cboard.cpp

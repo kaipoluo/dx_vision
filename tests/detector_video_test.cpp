@@ -43,22 +43,36 @@ int main(int argc, char * argv[])
 
   for (int frame_count = start_index; !exiter.exit(); frame_count++) {
     if (end_index > 0 && frame_count > end_index) break;
-
+  
     cv::Mat img;
     std::list<auto_aim::Armor> armors;
     video.read(img);
     if (img.empty()) break;
     // cv::GaussianBlur(img, img, cv::Size(5, 5), 0, 0, cv::BORDER_DEFAULT);
-
+  
     if (use_tradition)
       armors = detector.detect(img, frame_count);
     else
       armors = yolo.detect(img, frame_count);
-
+  
+    // 在图像上显示帧数
+    std::string frame_text = fmt::format("Frame: {}", frame_count);
+    cv::putText(img, frame_text, cv::Point(20, 40), cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 255, 0), 2);
+  
+    // 显示检测结果
+    for (const auto& armor : armors) {
+      for (int i = 0; i < 4; i++) {
+        cv::line(img, armor.points[i], armor.points[(i + 1) % 4], cv::Scalar(0, 0, 255), 2);
+      }
+    }
+  
+    // 显示图像
+    cv::imshow("Detection", img);
+  
     if (!armors.empty()) {
       nlohmann::json data;
       auto armor = armors.front();
-
+  
       data["armor_0_pixel_x"] = armor.points[0].x;
       data["armor_0_pixel_y"] = armor.points[0].y;
       data["armor_1_pixel_x"] = armor.points[1].x;

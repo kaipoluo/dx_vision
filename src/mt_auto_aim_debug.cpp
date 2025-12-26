@@ -5,7 +5,7 @@
 #include <opencv2/opencv.hpp>
 
 #include "io/camera.hpp"
-#include "io/cboard.hpp"
+#include "io/gimbal/gimbal.hpp"  // 替换cboard.hpp为gimbal.hpp
 #include "tasks/auto_aim/aimer.hpp"
 #include "tasks/auto_aim/multithread/commandgener.hpp"
 #include "tasks/auto_aim/multithread/mt_detector.hpp"
@@ -39,7 +39,7 @@ int main(int argc, char * argv[])
   tools::Plotter plotter;
   tools::Recorder recorder(100);  //根据实际帧率调整
 
-  io::CBoard cboard(config_path);
+  io::Gimbal gimbal(config_path);  // 替换cboard为gimbal
   io::Camera camera(config_path);
 
   auto_aim::multithread::MultiThreadDetector detector(config_path, true);
@@ -47,7 +47,7 @@ int main(int argc, char * argv[])
   auto_aim::Tracker tracker(config_path, solver);
   auto_aim::Aimer aimer(config_path);
   auto_aim::Shooter shooter(config_path);
-  auto_aim::multithread::CommandGener commandgener(shooter, aimer, cboard, plotter, true);
+  auto_aim::multithread::CommandGener commandgener(shooter, aimer, gimbal, plotter, true);  // 创建CommandGener实例，开启debug模式
 
   auto detect_thread = std::thread([&]() {
     cv::Mat img;
@@ -55,6 +55,7 @@ int main(int argc, char * argv[])
 
     while (!exiter.exit()) {
       camera.read(img, t);
+      cv::flip(img, img, -1);  // 镜像翻转图像
       detector.push(img, t);
     }
   });
@@ -66,11 +67,11 @@ int main(int argc, char * argv[])
     auto t0 = std::chrono::steady_clock::now();
     /// 自瞄核心逻辑
     auto [img, armors, t] = detector.debug_pop();
-    Eigen::Quaterniond q = cboard.imu_at(t - 1ms);
-    mode = cboard.mode;
+    Eigen::Quaterniond q = gimbal.q(t);  // 使用gimbal的q方法获取四元数
+    mode = static_cast<io::Mode>(static_cast<int>(gimbal.mode()));  // 转换gimbal模式到io::Mode
 
     if (last_mode != mode) {
-      tools::logger()->info("Switch to {}", io::MODES[mode]);
+      tools::logger()->info("Switch to {}", gimbal.str(gimbal.mode()));  // 使用gimbal的str方法获取模式字符串
       last_mode = mode;
     }
 
@@ -80,14 +81,45 @@ int main(int argc, char * argv[])
 
     auto targets = tracker.track(armors, t);
 
-    commandgener.push(targets, t, cboard.bullet_speed, ypr);  // 发送给决策线程
+    // 通过commandgener发送命令
+    commandgener.push(targets, t, gimbal.state().bullet_speed, ypr);
 
-    /// debug
-    tools::draw_text(img, fmt::format("[{}]", tracker.state()), {10, 30}, {255, 255, 255});
-
+   
+    
     nlohmann::json data;
     data["t"] = tools::delta_time(std::chrono::steady_clock::now(), t0);
 
+     /// debug
+    // 绘制自瞄状态文本
+    tools::draw_text(img, fmt::format("[{}]", tracker.state()), {10, 30}, {255, 255, 255});
+    //绘制GimabalToVision数据
+    tools::draw_text(
+      img,
+      fmt::format(
+        "Gimbal Mode: {}, Yaw: {:.2f}, Pitch: {:.2f}, Bullet Speed: {:.2f}",
+        gimbal.str(gimbal.mode()), ypr[0] * 57.3, ypr[1] * 57.3,
+        gimbal.state().bullet_speed),
+      {10, 60}, {255, 255, 0});
+      
+    //tools::draw_point()
+    // 绘制当前帧率
+    //auto fps = 1.0 / tools::delta_time(std::chrono::steady_clock::now(), t0);
+    // tools::draw_text(img, fmt::format("FPS: {:.2f}", fps), {10, 120}, {255, 255, 255});
+    //控制台打印帧数
+    //tools::logger()->info("Current FPS: {:.2f}", fps);
+        //绘制画面中心点
+    cv::circle(img, cv::Point(img.cols / 2, img.rows / 2), 5, {255, 0, 0}, -1);
+
+    // 连接识别到装甲板的对角线并比较中心
+    for (const auto &armor : armors) {
+      if( armor.points.size() !=4) continue;
+      // 连接对角线
+      cv::line(img, cv::Point(armor.points[0].x, armor.points[0].y), 
+      cv::Point(armor.points[2].x, armor.points[2].y), {0, 255, 0}, 2);
+      cv::line(img, cv::Point(armor.points[1].x, armor.points[1].y), 
+      cv::Point(armor.points[3].x, armor.points[3].y), {0, 255, 0}, 2);
+      
+    }
     // 装甲板原始观测数据
     data["armor_num"] = armors.size();
     if (!armors.empty()) {
@@ -157,8 +189,9 @@ int main(int argc, char * argv[])
     // 云台响应情况
     data["gimbal_yaw"] = ypr[0] * 57.3;
     data["gimbal_pitch"] = ypr[1] * 57.3;
-    data["bullet_speed"] = cboard.bullet_speed;
+    data["bullet_speed"] = gimbal.state().bullet_speed;  // 使用gimbal的state获取子弹速度
 
+   
     plotter.plot(data);
 
     cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸

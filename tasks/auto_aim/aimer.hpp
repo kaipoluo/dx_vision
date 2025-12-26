@@ -5,6 +5,7 @@
 #include <chrono>
 #include <list>
 
+#include "io/gimbal/gimbal.hpp"
 #include "io/cboard.hpp"
 #include "io/command.hpp"
 #include "target.hpp"

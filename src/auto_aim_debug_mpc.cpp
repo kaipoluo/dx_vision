@@ -51,8 +51,8 @@ int main(int argc, char * argv[])
   std::atomic<bool> quit = false;
   auto plan_thread = std::thread([&]() {
     auto t0 = std::chrono::steady_clock::now();
-    uint16_t last_bullet_count = 0;
-
+    // 移除last_bullet_count变量
+    
     while (!quit) {
       auto target = target_queue.front();
       auto gs = gimbal.state();
@@ -62,8 +62,9 @@ int main(int argc, char * argv[])
         plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
         plan.pitch_acc);
 
-      auto fired = gs.bullet_count > last_bullet_count;
-      last_bullet_count = gs.bullet_count;
+      // 修改fired变量定义，因为没有bullet_count来检测射击了
+      auto fired = false; // 简单处理，因为没有bullet_count了
+      // 移除对gs.bullet_count的赋值
 
       nlohmann::json data;
       data["t"] = tools::delta_time(std::chrono::steady_clock::now(), t0);

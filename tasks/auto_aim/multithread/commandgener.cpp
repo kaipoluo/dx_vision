@@ -8,9 +8,9 @@ namespace multithread
 {
 
 CommandGener::CommandGener(
-  auto_aim::Shooter & shooter, auto_aim::Aimer & aimer, io::CBoard & cboard,
+  auto_aim::Shooter & shooter, auto_aim::Aimer & aimer, io::Gimbal & gimbal,
   tools::Plotter & plotter, bool debug)
-: shooter_(shooter), aimer_(aimer), cboard_(cboard), plotter_(plotter), stop_(false), debug_(debug)
+: shooter_(shooter), aimer_(aimer), gimbal_(gimbal), plotter_(plotter), stop_(false), debug_(debug)
 {
   thread_ = std::thread(&CommandGener::generate_command, this);
 }
@@ -47,25 +47,57 @@ void CommandGener::generate_command()
         input = std::nullopt;
     }
     if (input) {
+      //can通信的命令生成
+      // auto command = aimer_.aim(input->targets_, input->t, input->bullet_speed);
+      // command.shoot = shooter_.shoot(command, aimer_, input->targets_, input->gimbal_pos);
+      // command.horizon_distance = input->targets_.empty()
+      //                              ? 0
+      //                              : std::sqrt(
+      //                                  tools::square(input->targets_.front().ekf_x()[0]) +
+      //                                  tools::square(input->targets_.front().ekf_x()[2]));
+
+      //串口gimbal命令生成
+      io::VisionToGimbal VisionToGimbal;
       auto command = aimer_.aim(input->targets_, input->t, input->bullet_speed);
-      command.shoot = shooter_.shoot(command, aimer_, input->targets_, input->gimbal_pos);
-      command.horizon_distance = input->targets_.empty()
-                                   ? 0
-                                   : std::sqrt(
-                                       tools::square(input->targets_.front().ekf_x()[0]) +
-                                       tools::square(input->targets_.front().ekf_x()[2]));
-      cboard_.send(command);
+      bool fire = shooter_.shoot(command, aimer_, input->targets_, input->gimbal_pos);
+      VisionToGimbal.mode = input->targets_.empty() ? 0 : 2;  //0不控制，2控制且开火
+      VisionToGimbal.yaw = command.yaw;
+      VisionToGimbal.pitch = -(command.pitch);
+      VisionToGimbal.shoot = fire;
+      VisionToGimbal.is_empty = input->targets_.empty();
+
+      
+
+      gimbal_.send(VisionToGimbal);  // 串口通信至云台
+
+      //debug VisionToGimbal Data
+      // if (debug_) {
+      //   int mode = static_cast<int>(VisionToGimbal.mode);
+      //   float yaw = VisionToGimbal.yaw;
+      //   float pitch = VisionToGimbal.pitch;
+      //   bool shoot = VisionToGimbal.shoot;
+      //   tools::logger()->debug(
+      //     "[CommandGener] Data sent to gimbal. Mode: {}, Yaw: {:.2f}, Pitch: {:.2f}, "
+      //     "Shoot: {}",
+      //     mode, yaw * 57.3, pitch * 57.3, shoot);
+      // }
+
       if (debug_) {
         nlohmann::json data;
         data["t"] = tools::delta_time(std::chrono::steady_clock::now(), t0);
-        data["cmd_yaw"] = command.yaw * 57.3;
-        data["cmd_pitch"] = command.pitch * 57.3;
-        data["shoot"] = command.shoot;
-        data["horizon_distance"] = command.horizon_distance;
+        int mode = static_cast<int>(VisionToGimbal.mode);
+        float yaw = VisionToGimbal.yaw;
+        float pitch = VisionToGimbal.pitch;
+        bool shoot = VisionToGimbal.shoot;
+        data["cmd_mode"] = mode;
+        data["cmd_yaw"] = yaw * 57.3;
+        data["cmd_pitch"] = pitch * 57.3;
+        data["shoot"] = shoot;
+        data["is_empty"] = VisionToGimbal.is_empty;
         plotter_.plot(data);
       }
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(2));  //approximately 500Hz
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));  //approximately 200Hz
   }
 }
 

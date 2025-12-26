@@ -7,29 +7,29 @@
 #include <mutex>
 #include <string>
 #include <thread>
-#include <tuple>
 
 #include "serial/serial.h"
 #include "tools/thread_safe_queue.hpp"
 
 namespace io
 {
+
+// 云台到视觉通信数据结构体
 struct __attribute__((packed)) GimbalToVision
 {
   uint8_t head[2] = {'S', 'P'};
   uint8_t mode;  // 0: 空闲, 1: 自瞄, 2: 小符, 3: 大符
-  float q[4];    // wxyz顺序
   float yaw;
   float yaw_vel;
   float pitch;
   float pitch_vel;
-  float bullet_speed;
-  uint16_t bullet_count;  // 子弹累计发送次数
+  float bullet_speed;// 子弹速度
+  
   uint16_t crc16;
 };
 
 static_assert(sizeof(GimbalToVision) <= 64);
-
+// 视觉到云台通信数据结构体
 struct __attribute__((packed)) VisionToGimbal
 {
   uint8_t head[2] = {'S', 'P'};
@@ -40,6 +40,8 @@ struct __attribute__((packed)) VisionToGimbal
   float pitch;
   float pitch_vel;
   float pitch_acc;
+  bool shoot;
+  bool is_empty;// 目标是否为空
   uint16_t crc16;
 };
 
@@ -60,7 +62,6 @@ struct GimbalState
   float pitch;
   float pitch_vel;
   float bullet_speed;
-  uint16_t bullet_count;
 };
 
 class Gimbal
