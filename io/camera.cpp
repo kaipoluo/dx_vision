@@ -25,7 +25,14 @@ Camera::Camera(const std::string & config_path)
     auto vid_pid = tools::read<std::string>(yaml, "vid_pid");
     camera_ = std::make_unique<HikRobot>(exposure_ms, gain, vid_pid);
   }
-
+  
+  else if (camera_name == "dahengvision") {
+    auto gamma = tools::read<double>(yaml, "gamma");
+    auto vid_pid = tools::read<std::string>(yaml, "vid_pid");
+    camera_ = std::make_unique<DahengVision>(exposure_ms, gamma, vid_pid);
+  }
+   
+  }
   else {
     throw std::runtime_error("Unknow camera_name: " + camera_name + "!");
   }
