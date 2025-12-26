@@ -41,58 +41,58 @@ int main(int argc, char * argv[])
   auto first_fired = false;
 
   while (!exiter.exit()) {
-    auto mode = gimbal.mode();
+    // auto mode = gimbal.mode();
 
-    if (mode != last_mode) {
-      tools::logger()->info("Gimbal mode changed: {}", gimbal.str(mode));
-      last_mode = mode;
-    }
+    // if (mode != last_mode) {
+    //   tools::logger()->info("Gimbal mode changed: {}", gimbal.str(mode));
+    //   last_mode = mode;
+    // }
 
-    auto t = std::chrono::steady_clock::now();
-    auto state = gimbal.state();
-    auto q = gimbal.q(t);
-    auto ypr = tools::eulers(q, 2, 1, 0);
+    // auto t = std::chrono::steady_clock::now();
+    // auto state = gimbal.state();
+    // auto q = gimbal.q(t);
+    // auto ypr = tools::eulers(q, 2, 1, 0);
 
     // auto fired = state.bullet_count > last_bullet_count;
     // last_bullet_count = state.bullet_count;
 
-    if (!first_fired && fired) {
-      first_fired = true;
-      tools::logger()->info("Gimbal first fired after: {:.3f}s", tools::delta_time(t, fire_stamp));
-    }
+  //   if (!first_fired && fired) {
+  //     first_fired = true;
+  //     tools::logger()->info("Gimbal first fired after: {:.3f}s", tools::delta_time(t, fire_stamp));
+  //   }
 
-    if (fire && fire_count > 20) {
-      // 0.2 s
-      fire = false;
-      fire_count = 0;
-    } else if (!fire && fire_count > 100) {
-      // 1s
-      fire = true;
-      fire_count = 0;
-      fire_stamp = t;
-      first_fired = false;
-    }
-    fire_count++;
+  //   if (fire && fire_count > 20) {
+  //     // 0.2 s
+  //     fire = false;
+  //     fire_count = 0;
+  //   } else if (!fire && fire_count > 100) {
+  //     // 1s
+  //     fire = true;
+  //     fire_count = 0;
+  //     fire_stamp = t;
+  //     first_fired = false;
+  //   }
+  //   fire_count++;
 
-    gimbal.send(true, test_fire && fire, 1, 0, 0, 0, 0, 0);
+  //   gimbal.send(true, test_fire && fire, 1, 0, 0, 0, 0, 0);
 
-    nlohmann::json data;
-    data["q_yaw"] = ypr[0];
-    data["q_pitch"] = ypr[1];
-    data["yaw"] = state.yaw;
-    data["vyaw"] = state.yaw_vel;
-    data["pitch"] = state.pitch;
-    data["vpitch"] = state.pitch_vel;
-    data["bullet_speed"] = state.bullet_speed;
-    //删除子弹数量
-    //data["bullet_count"] = state.bullet_count;
-    data["fired"] = fired ? 1 : 0;
-    data["fire"] = test_fire && fire ? 1 : 0;
-    data["t"] = tools::delta_time(t, t0);
-    plotter.plot(data);
+  //   nlohmann::json data;
+  //   data["q_yaw"] = ypr[0];
+  //   data["q_pitch"] = ypr[1];
+  //   data["yaw"] = state.yaw;
+  //   data["vyaw"] = state.yaw_vel;
+  //   data["pitch"] = state.pitch;
+  //   data["vpitch"] = state.pitch_vel;
+  //   data["bullet_speed"] = state.bullet_speed;
+  //   //删除子弹数量
+  //   //data["bullet_count"] = state.bullet_count;
+  //   //data["fired"] = fired ? 1 : 0;
+  //   //data["fire"] = test_fire && fire ? 1 : 0;
+  //   data["t"] = tools::delta_time(t, t0);
+  //   plotter.plot(data);
 
-    std::this_thread::sleep_for(9ms);
-  }
+  //   std::this_thread::sleep_for(9ms);
+  // }
 
   gimbal.send(false, false, 0, 0, 0, 0, 0, 0);
 
