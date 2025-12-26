@@ -8,6 +8,7 @@ add_subdirectory(serial)
 add_library(io STATIC 
     hikrobot/hikrobot.cpp    
     mindvision/mindvision.cpp  
+    dahengvision/dahengvision.cpp
     usbcamera/usbcamera.cpp  
     camera.cpp
     cboard.cpp
@@ -35,7 +36,18 @@ else()
   message(FATAL_ERROR "Unsupported architecture: ${CMAKE_HOST_SYSTEM_PROCESSOR}!")
 endif()
 
+# dahengvision
+target_include_directories(io PUBLIC dahengvision/include)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
+  target_link_directories(io PUBLIC dahengvision/lib/amd64)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
+  target_link_directories(io PUBLIC dahengvision/lib/arm64)
+else()
+  message(FATAL_ERROR "Unsupported architecture: ${CMAKE_HOST_SYSTEM_PROCESSOR}!")
+endif()
+
 target_link_libraries(io MvCameraControl MVSDK usb-1.0 yaml-cpp serial)
+
 
 ################## 检查 ROS 环境 ##################
 find_package(ament_cmake QUIET)
