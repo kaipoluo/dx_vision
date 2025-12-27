@@ -62,6 +62,20 @@ public:
     return std::move(value);
   }
 
+  bool try_pop(T & value, int timeout_ms)
+  {
+    std::unique_lock<std::mutex> lock(mutex_);
+    
+    if (not_empty_condition_.wait_for(lock, std::chrono::milliseconds(timeout_ms), 
+                                     [this] { return !queue_.empty(); })) {
+      if (!queue_.empty()) {
+        value = queue_.front();
+        queue_.pop();
+        return true;
+      }
+    }
+    return false;
+  }
   T front()
   {
     std::unique_lock<std::mutex> lock(mutex_);
