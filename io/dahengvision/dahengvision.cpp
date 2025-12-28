@@ -196,10 +196,10 @@ void DahengVision::open()
                 {
                     if (frame_buffer->nStatus == GX_FRAME_STATUS_SUCCESS)
                     {
-                        // BayerBG8转RGB（OpenCV原生转换）
+                        // BayerBG8转RGB，但直接转换为BGR以解决红蓝颠倒问题
                         cv::Mat bayer_img(height_, width_, CV_8UC1, frame_buffer->pImgBuf);
                         cv::Mat rgb_img;
-                        cv::cvtColor(bayer_img, rgb_img, cv::COLOR_BayerBG2RGB);
+                        cv::cvtColor(bayer_img, rgb_img, cv::COLOR_BayerBG2BGR);
         
                         // 存入线程安全队列
                         CameraData data;
