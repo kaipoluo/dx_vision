@@ -32,3 +32,12 @@
     -d: 显示视频流\
     -h 或 --help: 显示帮助信息
 # 自启动设置
+
+
+link:
+
+export LD_LIBRARY_PATH=./io/dahengvision/lib/amd64:$LD_LIBRARY_PATH
+
+
+echo 'export LD_LIBRARY_PATH=/home/ning/桌面/dx_vision/io/dahengvision/lib/amd64:$LD_LIBRARY_PATH' >> ~/.bashrc
+source ~/.bashrc
