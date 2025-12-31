@@ -1,9 +1,6 @@
 #include "dahengvision.hpp"
-#include <cstring>
-#include <iostream>
-#include <sstream>
-#include <unistd.h>
-
+#include <libusb-1.0/libusb.h>
+#include "tools/logger.hpp"
 namespace io
 {
 
@@ -17,13 +14,28 @@ DahengVision::DahengVision(double exposure_ms, double gamma, const std::string &
       width_(0),
       quit_(false),
       ok_(false),
-      vid_(0),
-      pid_(0)
+      vid_(-1),
+      pid_(-1)
 {
     set_vid_pid(vid_pid);
-    open();
-    // 启动守护线程（监测相机状态，自动重连）
-    daemon_thread_ = std::thread(&DahengVision::try_open, this);
+    if (libusb_init(NULL)) tools::logger()->warn("Unable to init libusb!");
+
+    try_open();
+
+    // 守护线程
+    daemon_thread_ = std::thread{[this] {
+        while (!quit_) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+            if (ok_) continue;
+
+            if (capture_thread_.joinable()) capture_thread_.join();
+
+            close();
+            reset_usb();
+            try_open();
+        }
+    }};
 }
 
 // 析构函数：释放资源
@@ -61,25 +73,24 @@ void DahengVision::set_vid_pid(const std::string & vid_pid)
     }
 }
 
-// USB设备复位（仅Linux系统，针对USB3相机）
+// USB设备复位（使用libusb库，与mindvision和hikrobot保持一致）
 void DahengVision::reset_usb() const
 {
-    if (vid_ == 0 || pid_ == 0)
-        return;
+    if (vid_ == -1 || pid_ == -1) return;
 
-    // 构造USB复位命令（通过sysfs接口，使用十六进制格式的VID）
-    char vid_str[5] = {0};
-    sprintf(vid_str, "%04x", vid_);
-    
-    std::string cmd = "find /sys/bus/usb/devices/ -name \"*" + std::string(vid_str) + "*\" | "
-                      "grep -v ':1\.' | head -1 | xargs -I {} sh -c "
-                      "'echo 0 > {}/authorized && sleep 0.5 && echo 1 > {}/authorized'";
-    
-    int ret = system(cmd.c_str());
-    if (ret != 0)
-        std::cerr << "USB复位失败，命令返回码：" << ret << std::endl;
+    // 使用libusb进行USB复位
+    auto handle = libusb_open_device_with_vid_pid(NULL, vid_, pid_);
+    if (!handle) {
+        tools::logger()->warn("Unable to open usb!");
+        return;
+    }
+
+    if (libusb_reset_device(handle))
+        tools::logger()->warn("Unable to reset usb!");
     else
-        std::cerr << "USB复位成功" << std::endl;
+        tools::logger()->info("Reset usb successfully :)");
+
+    libusb_close(handle);
 }
 
 // 打开相机：初始化SDK + 枚举设备 + 配置参数 + 启动采集线程
@@ -89,33 +100,36 @@ void DahengVision::open()
     GX_STATUS status = GXInitLib();
     if (status != GX_STATUS_SUCCESS)
     {
-        std::cerr << "SDK初始化失败，错误码：" << status << std::endl;
+        tools::logger()->error("SDK initialization failed, error code: {}", status);
         return;
     }
+
+    // 禁用大恒相机的日志输出
+    GXSetLogType(GX_LOG_TYPE_OFF);
 
     // 枚举设备
     uint32_t device_num = 0;
     status = GXUpdateAllDeviceList(&device_num, 1000);
     if (status != GX_STATUS_SUCCESS || device_num == 0)
     {
-        std::cerr << "未发现相机设备，错误码：" << status << std::endl;
+        tools::logger()->error("No camera device found, error code: {}", status);
         GXCloseLib();
         return;
     }
 
-    std::cout << "发现 " << device_num << " 台相机设备" << std::endl;
+    tools::logger()->info("Found {} camera devices", device_num);
     
     // 打开第一台设备（可根据vid/pid过滤，此处简化为默认第一台）
     GX_OPEN_PARAM open_param;
     memset(&open_param, 0, sizeof(GX_OPEN_PARAM));
     open_param.accessMode = GX_ACCESS_CONTROL;  // 控制模式
     open_param.openMode = GX_OPEN_INDEX;          // 按索引打开
-    open_param.pszContent = const_cast<char*>("1");  // 修正：设备索引从1开始
+    open_param.pszContent = const_cast<char*>("1");  // 设备索引从1开始
     
     status = GXOpenDevice(&open_param, &handle_);
     if (status != GX_STATUS_SUCCESS)
     {
-        std::cerr << "相机打开失败，错误码：" << status << std::endl;
+        tools::logger()->error("Camera open failed, error code: {}", status);
         GXCloseLib();
         return;
     }
@@ -130,21 +144,21 @@ void DahengVision::open()
         {
             status = GXSetFloatValue(handle_, "Gamma", gamma_);
             if (status != GX_STATUS_SUCCESS)
-                throw std::runtime_error("设置Gamma失败");
+                throw std::runtime_error("Failed to set Gamma");
         }
 
         // 2. 设置曝光时间（单位：微秒）
         status = GXSetEnumValueByString(handle_, "ExposureMode", "Timed");
         if (status != GX_STATUS_SUCCESS)
-            throw std::runtime_error("设置曝光模式失败");
+            throw std::runtime_error("Failed to set exposure mode");
         status = GXSetFloatValue(handle_, "ExposureTime", exposure_ms_ * 1000);
         if (status != GX_STATUS_SUCCESS)
-            throw std::runtime_error("设置曝光时间失败");
+            throw std::runtime_error("Failed to set exposure time");
 
         // 3. 设置采集模式为连续采集
         status = GXSetEnumValueByString(handle_, "AcquisitionMode", "Continuous");
         if (status != GX_STATUS_SUCCESS)
-            throw std::runtime_error("设置采集模式失败");
+            throw std::runtime_error("Failed to set acquisition mode");
 
         // 4. 设置像素格式为BayerBG8（兼容OpenCV转换）
         GX_ENUM_VALUE pixel_format;
@@ -182,7 +196,7 @@ void DahengVision::open()
         // 7. 启动流传输（Linux专用）
         status = GXStreamOn(handle_);
         if (status != GX_STATUS_SUCCESS)
-            throw std::runtime_error("启动流传输失败");
+            throw std::runtime_error("Failed to start stream transmission");
         
         // 8. 启动采集线程（流传输启动后再启动采集线程）
         ok_ = true;
@@ -213,7 +227,7 @@ void DahengVision::open()
                 }
                 else if (status != GX_STATUS_TIMEOUT)
                 {
-                    std::cerr << "采集图像失败，错误码：" << status << std::endl;
+                    tools::logger()->error("Image capture failed, error code: {}", status);
                     ok_ = false;
                     break;
                 }
@@ -222,12 +236,12 @@ void DahengVision::open()
             }
         });
 
-        std::cout << "相机启动成功：" << width_ << "x" << height_ 
-                  << " | 曝光时间：" << exposure_ms_ << "ms" << std::endl;
+        tools::logger()->info("Camera started successfully: {}x{} | Exposure time: {}ms", 
+                            width_, height_, exposure_ms_);
     }
     catch (const std::exception &e)
     {
-        std::cerr << "相机配置失败：" << e.what() << std::endl;
+        tools::logger()->error("Camera configuration failed: {}", e.what());
         close();
         GXCloseLib();
     }
@@ -257,12 +271,13 @@ void DahengVision::read(cv::Mat &img, std::chrono::steady_clock::time_point &tim
     CameraData data;
     if (queue_.try_pop(data, 1000))  // 1秒超时
     {
-        img = data.img;
+        //添加翻转图像，适配倒装相机
+        cv::flip(data.img, img, -1); // flipCode = -1 表示水平和垂直翻转
         timestamp = data.timestamp;
     }
     else
     {
-        std::cerr << "图像读取超时" << std::endl;
+        tools::logger()->warn("Image read timeout");
         // 返回一个空的有效图像，避免后续处理崩溃
         img = cv::Mat(height_, width_, CV_8UC3, cv::Scalar(0, 0, 0));
         timestamp = std::chrono::steady_clock::now();
@@ -272,18 +287,10 @@ void DahengVision::read(cv::Mat &img, std::chrono::steady_clock::time_point &tim
 // 守护线程：监测相机状态，自动重连
 void DahengVision::try_open()
 {
-    while (!quit_)
-    {
-        if (!ok_ && !quit_)
-        {
-            std::cerr << "尝试重新连接相机..." << std::endl;
-            close();          // 确保资源释放
-            reset_usb();      // USB相机复位（可选）
-            sleep(1);         // 等待1秒后重连
-            open();           // 重新打开相机
-        }
-        sleep(1);  // 每秒检测一次状态
-    }
+    if (ok_) return;
+
+    tools::logger()->info("Trying to open camera...");
+    open();
 }
 
 }  // namespace io

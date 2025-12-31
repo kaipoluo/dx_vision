@@ -46,8 +46,8 @@ void HikRobot::read(cv::Mat & img, std::chrono::steady_clock::time_point & times
 {
   CameraData data;
   queue_.pop(data);
-
-  img = data.img;
+  // 镜像翻转图像
+  cv::flip(data.img, img, -1);  // flipCode = -1 表示水平和垂直翻转
   timestamp = data.timestamp;
 }
 
