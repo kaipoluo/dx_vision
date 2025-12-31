@@ -26,11 +26,14 @@
     ./build/gimbal_response_test configs/standard4.yaml
 
 ## 相机标定
-    ./build/camera_calib configs/camera.yaml
-    参数说明：
-    -c 或 --config-path: 指定相机配置文件的路径\
-    -d: 显示视频流\
-    -h 或 --help: 显示帮助信息
+### 1.捕获标定图片
+    ./build/capture 
+    按下'S'键开始捕获图片，按下'Q'键退出
+### 2.标定相机(获取相机内参和畸变系数)
+    ./build/calibrate
+### 3.手眼标定(获取相机到gimbal的变换矩阵)
+    ./build/hand_eye_calib
+
 # 自启动设置
 
 
