@@ -193,12 +193,16 @@ void DahengVision::open()
             GXSetIntValue(data_stream, "ResendTimeout", 200);  // 重传超时200ms
         }
 
-        // 7. 启动流传输（Linux专用）
+        // 7. 设置设备级图像翻转,适配倒装的相机
+        GXSetBool(handle_, GX_BOOL_REVERSE_X, true);  // 水平翻转
+        GXSetBool(handle_, GX_BOOL_REVERSE_Y, true);  // 垂直翻转
+
+        // 8. 启动流传输（Linux专用）
         status = GXStreamOn(handle_);
         if (status != GX_STATUS_SUCCESS)
             throw std::runtime_error("Failed to start stream transmission");
         
-        // 8. 启动采集线程（流传输启动后再启动采集线程）
+        // 9. 启动采集线程（流传输启动后再启动采集线程）
         ok_ = true;
         capture_thread_ = std::thread([this]() {
             GX_FRAME_BUFFER* frame_buffer = nullptr;
@@ -271,8 +275,8 @@ void DahengVision::read(cv::Mat &img, std::chrono::steady_clock::time_point &tim
     CameraData data;
     if (queue_.try_pop(data, 1000))  // 1秒超时
     {
-        //添加翻转图像，适配倒装相机
-        cv::flip(data.img, img, -1); // flipCode = -1 表示水平和垂直翻转
+        // 直接使用队列中的图像，相机已在硬件层面完成翻转
+        img = data.img.clone();
         timestamp = data.timestamp;
     }
     else
