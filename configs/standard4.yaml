@@ -83,7 +83,7 @@ t_camera2gimbal: [-0.034955523715399906, -0.000074403211899371, 0.00124817391010
 
 #####-----gimbal参数-----#####
 com_port: "/dev/ttyACM0"
-baud_rate: 9600     # 波特率
+baud_rate: 115200     # 波特率
 bytesize: 8             # 数据位
 parity: "none"          # 奇偶校验（none/odd/even）
 stopbits: 1             # 停止位

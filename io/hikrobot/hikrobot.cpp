@@ -46,7 +46,8 @@ void HikRobot::read(cv::Mat & img, std::chrono::steady_clock::time_point & times
 {
   CameraData data;
   queue_.pop(data);
-  img = data.img; // 直接使用SDK翻转后的图像，不再需要OpenCV翻转
+
+  img = data.img;
   timestamp = data.timestamp;
 }
 
@@ -128,7 +129,7 @@ void HikRobot::capture_start()
       cvt_param.nDstBufferSize = img.total() * img.elemSize();
       cvt_param.enDstPixelType = PixelType_Gvsp_BGR8_Packed;
 
-      // 转换像素格式
+      // ret = MV_CC_ConvertPixelType(handle_, &cvt_param);
       const auto & frame_info = raw.stFrameInfo;
       auto pixel_type = frame_info.enPixelType;
       cv::Mat dst_image;
@@ -139,24 +140,6 @@ void HikRobot::capture_start()
         {PixelType_Gvsp_BayerBG8, cv::COLOR_BayerBG2RGB}};
       cv::cvtColor(img, dst_image, type_map.at(pixel_type));
       img = dst_image;
-
-      // 使用海康SDK实现图像翻转，适配倒装的相机
-      MV_CC_FLIP_IMAGE_PARAM flip_param;
-      flip_param.enPixelType = PixelType_Gvsp_BGR8_Packed;
-      flip_param.nWidth = raw.stFrameInfo.nWidth;
-      flip_param.nHeight = raw.stFrameInfo.nHeight;
-      flip_param.pSrcData = img.data;
-      flip_param.nSrcDataLen = img.total() * img.elemSize();
-      flip_param.pDstBuf = img.data;
-      flip_param.nDstBufSize = flip_param.nSrcDataLen;
-      flip_param.enFlipType = static_cast<MV_IMG_FLIP_TYPE>(MV_FLIP_VERTICAL | MV_FLIP_HORIZONTAL);
-      // 初始化预留字段
-      memset(flip_param.nRes, 0, sizeof(flip_param.nRes));
-
-      ret = MV_CC_FlipImage(handle_, &flip_param);
-      if (ret != MV_OK) {
-        tools::logger()->warn("MV_CC_FlipImage failed: {:#x}", ret);
-      }
 
       queue_.push({img, timestamp});
 
