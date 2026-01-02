@@ -73,13 +73,36 @@ void load(
     tools::draw_text(drawing, fmt::format("pitch {:.2f}", ypr[1]), {40, 80}, {0, 0, 255});
     tools::draw_text(drawing, fmt::format("roll  {:.2f}", ypr[2]), {40, 120}, {0, 0, 255});
 
-    // 识别标定板
-    std::vector<cv::Point2f> centers_2d;
-    auto success = cv::findCirclesGrid(img, pattern_size, centers_2d);  // 默认是对称圆点图案
+    // // 识别标定板
+    // std::vector<cv::Point2f> centers_2d;
+    // auto success = cv::findCirclesGrid(img, pattern_size, centers_2d);  // 默认是对称圆点图案
 
+    // // 显示识别结果
+    // cv::drawChessboardCorners(drawing, pattern_size, centers_2d, success);
+    // cv::resize(drawing, drawing, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
+    // cv::imshow("Press any to continue", drawing);
+    // cv::waitKey(0);
+
+    // 转换为灰度图用于检测
+    cv::Mat gray;
+    cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
+
+    // 识别棋盘格角点
+    std::vector<cv::Point2f> corners_2d;
+    auto success = cv::findChessboardCorners(
+      gray, pattern_size, corners_2d,
+      cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_NORMALIZE_IMAGE | cv::CALIB_CB_FAST_CHECK);
+
+    // 如果检测成功，进一步精确角点位置
+    if (success) {
+      cv::cornerSubPix(
+        gray, corners_2d, cv::Size(11, 11), cv::Size(-1, -1),
+        cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::MAX_ITER, 30, 0.001));
+    }
     // 显示识别结果
-    cv::drawChessboardCorners(drawing, pattern_size, centers_2d, success);
-    cv::resize(drawing, drawing, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
+
+    cv::drawChessboardCorners(drawing, pattern_size, corners_2d, success);
+    cv::resize(drawing, drawing, {}, 0.5, 0.5);  // 缩小图片尺寸便于显示完全
     cv::imshow("Press any to continue", drawing);
     cv::waitKey(0);
 
@@ -94,7 +117,7 @@ void load(
     cv::Mat rvec, tvec;
     auto centers_3d_ = centers_3d(pattern_size, center_distance_mm);
     cv::solvePnP(
-      centers_3d_, centers_2d, camera_matrix, distort_coeffs, rvec, tvec, false, cv::SOLVEPNP_IPPE);
+      centers_3d_, corners_2d, camera_matrix, distort_coeffs, rvec, tvec, false, cv::SOLVEPNP_IPPE);
 
     // 记录所需的数据
     R_gimbal2world_list.emplace_back(R_gimbal2world_cv);
@@ -119,8 +142,9 @@ void print_yaml(
   result << YAML::Value << YAML::Flow << R_gimbal2imubody_data;
   result << YAML::Newline;
   result << YAML::Newline;
-  result << YAML::Comment(fmt::format(
-    "相机同理想情况的偏角: yaw{:.2f} pitch{:.2f} roll{:.2f} degree", ypr[0], ypr[1], ypr[2]));
+  result << YAML::Comment(
+    fmt::format(
+      "相机同理想情况的偏角: yaw{:.2f} pitch{:.2f} roll{:.2f} degree", ypr[0], ypr[1], ypr[2]));
   result << YAML::Key << "R_camera2gimbal";
   result << YAML::Value << YAML::Flow << R_camera2gimbal_data;
   result << YAML::Key << "t_camera2gimbal";

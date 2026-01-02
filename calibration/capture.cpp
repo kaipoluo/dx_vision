@@ -41,13 +41,35 @@ void capture_loop(int pattern_cols, int pattern_rows,
     // 在图像上显示欧拉角，用来判断imuabs系的xyz正方向，同时判断imu是否存在零漂
     auto img_with_ypr = img.clone();
     Eigen::Vector3d zyx = tools::eulers(q, 2, 1, 0) * 57.3;  // degree
-    tools::draw_text(img_with_ypr, fmt::format("Z {:.2f}", zyx[0]), {40, 40}, {0, 0, 255});
-    tools::draw_text(img_with_ypr, fmt::format("Y {:.2f}", zyx[1]), {40, 80}, {0, 0, 255});
-    tools::draw_text(img_with_ypr, fmt::format("X {:.2f}", zyx[2]), {40, 120}, {0, 0, 255});
+    tools::draw_text(img_with_ypr, fmt::format("Yaw {:.2f}", zyx[0]), {40, 40}, {0, 0, 255});
+    tools::draw_text(img_with_ypr, fmt::format("Pitch {:.2f}", zyx[1]), {40, 80}, {0, 0, 255});
+    tools::draw_text(img_with_ypr, fmt::format("Roll {:.2f}", zyx[2]), {40, 120}, {0, 0, 255});
+
+    // tools::draw_text(img_with_ypr, fmt::format("Z {:.2f}", zyx[0]), {40, 40}, {0, 0, 255});
+    // tools::draw_text(img_with_ypr, fmt::format("Y {:.2f}", zyx[1]), {40, 80}, {0, 0, 255});
+    // tools::draw_text(img_with_ypr, fmt::format("X {:.2f}", zyx[2]), {40, 120}, {0, 0, 255});
 
     std::vector<cv::Point2f> centers_2d;
-    auto success = cv::findChessboardCorners(img, cv::Size(pattern_cols, pattern_rows), centers_2d);  // 默认是方形网格图案
-    cv::drawChessboardCorners(img_with_ypr, cv::Size(pattern_cols, pattern_rows), centers_2d, success);  // 显示识别结果
+    //auto success = cv::findCirclesGrid(img, cv::Size(pattern_cols, pattern_rows), centers_2d);  // 默认是对称圆点图案
+    //cv::drawChessboardCorners(img_with_ypr, cv::Size(pattern_cols, pattern_rows), centers_2d, success);  // 显示识别结果
+
+    cv::Mat gray;
+    cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
+    
+    // 检测方形棋盘格角点
+    auto success = cv::findChessboardCorners(gray, cv::Size(11, 8), centers_2d, 
+                                       cv::CALIB_CB_ADAPTIVE_THRESH | 
+                                       cv::CALIB_CB_NORMALIZE_IMAGE |
+                                       cv::CALIB_CB_FAST_CHECK);
+    
+    // 如果检测成功，可以进一步精确角点位置
+    if (success) {
+        cv::cornerSubPix(gray, centers_2d, cv::Size(11, 11), cv::Size(-1, -1), 
+                        cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::MAX_ITER, 30, 0.001));
+    }
+    
+    // 绘制检测结果
+    cv::drawChessboardCorners(img_with_ypr, cv::Size(11, 8), centers_2d, success);
     cv::resize(img_with_ypr, img_with_ypr, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
 
     // 按“s”保存图片和对应四元数，按“q”退出程序
@@ -82,14 +104,14 @@ int main(int argc, char * argv[])
   auto output_folder = cli.get<std::string>("output-folder");
   // 新建输出文件夹
   std::filesystem::create_directory(output_folder);
-
-  tools::logger()->info("标定板尺寸为列行");
-  // 主循环，保存图片和对应四元数 
   auto yaml = YAML::LoadFile(config_path);
   auto pattern_cols = yaml["pattern_cols"];
   auto pattern_rows = yaml["pattern_rows"];
+  tools::logger()->info("标定板尺寸为列行{}x{},中心间距{}mm", pattern_cols.as<int>(), pattern_rows.as<int>(), yaml["center_distance_mm"].as<double>());
+  // 主循环，保存图片和对应四元数 
+
   
-  capture_loop(pattern_cols.as<int>(), pattern_rows.as<int>(), config_path, output_folder);
+  capture_loop(pattern_cols.as<int>()-1, pattern_rows.as<int>()-1, config_path, output_folder);
 
   tools::logger()->warn("注意四元数输出顺序为wxyz");
 
