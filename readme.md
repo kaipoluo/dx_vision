@@ -26,14 +26,19 @@
     ./build/gimbal_response_test configs/standard4.yaml
 
 ## 相机标定
+在calibration.yaml中适配标定板和相机参数
 ### 1.捕获标定图片
     ./build/capture 
     按下'S'键开始捕获图片，按下'Q'键退出
 ### 2.标定相机(获取相机内参和畸变系数)
-    ./build/calibrate
+    ./build/calibrate_camera
+
+
+将获取的内参和畸变系数放入calibration.yaml以供手眼标定使用
 ### 3.手眼标定(获取相机到gimbal的变换矩阵)
     ./build/hand_eye_calib
-
+### 手眼标定程序(同时计算标定板位置)
+    ./build/calibrate_robotworld_handeye
 # 自启动设置
 
 

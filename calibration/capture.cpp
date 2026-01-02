@@ -5,10 +5,11 @@
 #include <opencv2/opencv.hpp>
 
 #include "io/camera.hpp"
-#include "io/cboard.hpp"
+#include "io/gimbal/gimbal.hpp"
 #include "tools/img_tools.hpp"
 #include "tools/logger.hpp"
 #include "tools/math_tools.hpp"
+#include "yaml-cpp/yaml.h"
 
 const std::string keys =
   "{help h usage ?  |                          | 输出命令行参数说明}"
@@ -24,10 +25,10 @@ void write_q(const std::string q_path, const Eigen::Quaterniond & q)
   q_file.close();
 }
 
-void capture_loop(
-  const std::string & config_path, const std::string & can, const std::string & output_folder)
+void capture_loop(int pattern_cols, int pattern_rows,
+  const std::string & config_path, const std::string & output_folder)
 {
-  io::CBoard cboard(config_path);
+  io::Gimbal gimbal(config_path);
   io::Camera camera(config_path);
   cv::Mat img;
   std::chrono::steady_clock::time_point timestamp;
@@ -35,7 +36,7 @@ void capture_loop(
   int count = 0;
   while (true) {
     camera.read(img, timestamp);
-    Eigen::Quaterniond q = cboard.imu_at(timestamp);
+    Eigen::Quaterniond q = gimbal.q(timestamp);
 
     // 在图像上显示欧拉角，用来判断imuabs系的xyz正方向，同时判断imu是否存在零漂
     auto img_with_ypr = img.clone();
@@ -45,8 +46,8 @@ void capture_loop(
     tools::draw_text(img_with_ypr, fmt::format("X {:.2f}", zyx[2]), {40, 120}, {0, 0, 255});
 
     std::vector<cv::Point2f> centers_2d;
-    auto success = cv::findCirclesGrid(img, cv::Size(10, 7), centers_2d);  // 默认是对称圆点图案
-    cv::drawChessboardCorners(img_with_ypr, cv::Size(10, 7), centers_2d, success);  // 显示识别结果
+    auto success = cv::findChessboardCorners(img, cv::Size(pattern_cols, pattern_rows), centers_2d);  // 默认是方形网格图案
+    cv::drawChessboardCorners(img_with_ypr, cv::Size(pattern_cols, pattern_rows), centers_2d, success);  // 显示识别结果
     cv::resize(img_with_ypr, img_with_ypr, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
 
     // 按“s”保存图片和对应四元数，按“q”退出程序
@@ -66,7 +67,7 @@ void capture_loop(
     tools::logger()->info("[{}] Saved in {}", count, output_folder);
   }
 
-  // 离开该作用域时，camera和cboard会自动关闭
+  // 离开该作用域时，camera和gimbal会自动关闭
 }
 
 int main(int argc, char * argv[])
@@ -79,13 +80,16 @@ int main(int argc, char * argv[])
   }
   auto config_path = cli.get<std::string>(0);
   auto output_folder = cli.get<std::string>("output-folder");
-
   // 新建输出文件夹
   std::filesystem::create_directory(output_folder);
 
-  tools::logger()->info("默认标定板尺寸为10列7行");
-  // 主循环，保存图片和对应四元数
-  capture_loop(config_path, "can0", output_folder);
+  tools::logger()->info("标定板尺寸为列行");
+  // 主循环，保存图片和对应四元数 
+  auto yaml = YAML::LoadFile(config_path);
+  auto pattern_cols = yaml["pattern_cols"];
+  auto pattern_rows = yaml["pattern_rows"];
+  
+  capture_loop(pattern_cols.as<int>(), pattern_rows.as<int>(), config_path, output_folder);
 
   tools::logger()->warn("注意四元数输出顺序为wxyz");
 
