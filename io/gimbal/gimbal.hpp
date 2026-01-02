@@ -23,8 +23,8 @@ struct __attribute__((packed)) GimbalToVision
   float yaw_vel;
   float pitch;
   float pitch_vel;
-  float bullet_speed;// 子弹速度
-  
+  float bullet_speed;  // 子弹速度
+
   uint16_t crc16;
 };
 
@@ -41,7 +41,7 @@ struct __attribute__((packed)) VisionToGimbal
   float pitch_vel;
   float pitch_acc;
   bool shoot;
-  bool is_empty;// 目标是否为空
+  bool is_empty;  // 目标是否为空
   uint16_t crc16;
 };
 
@@ -75,7 +75,7 @@ public:
   GimbalState state() const;
   std::string str(GimbalMode mode) const;
   Eigen::Quaterniond q(std::chrono::steady_clock::time_point t);
-
+  Eigen::Quaterniond imu_at(std::chrono::steady_clock::time_point t);
   void send(
     bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
     float pitch_acc);
@@ -96,7 +96,8 @@ private:
   GimbalState state_;
   tools::ThreadSafeQueue<std::tuple<Eigen::Quaterniond, std::chrono::steady_clock::time_point>>
     queue_{1000};
-
+  std::tuple<Eigen::Quaterniond, std::chrono::steady_clock::time_point> data_ahead_;
+  std::tuple<Eigen::Quaterniond, std::chrono::steady_clock::time_point> data_behind_;
   bool read(uint8_t * buffer, size_t size);
   void read_thread();
   void reconnect();

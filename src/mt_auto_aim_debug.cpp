@@ -66,7 +66,7 @@ int main(int argc, char * argv[])
     auto t0 = std::chrono::steady_clock::now();
     /// 自瞄核心逻辑
     auto [img, armors, t] = detector.debug_pop();
-    Eigen::Quaterniond q = gimbal.q(t);  // 使用gimbal的q方法获取四元数
+    Eigen::Quaterniond q = gimbal.q(t-1ms);  // 取上一帧的数据,补偿传输延时
     mode = static_cast<io::Mode>(static_cast<int>(gimbal.mode()));  // 转换gimbal模式到io::Mode
 
     if (last_mode != mode) {
@@ -188,7 +188,7 @@ int main(int argc, char * argv[])
     // 云台响应情况
     data["gimbal_yaw"] = ypr[0] * 57.3;
     data["gimbal_pitch"] = ypr[1] * 57.3;
-    data["bullet_speed"] = gimbal.state().bullet_speed;  // 使用gimbal的state获取子弹速度
+    //data["bullet_speed"] = gimbal.state().bullet_speed;  // 使用gimbal的state获取子弹速度
 
    
     plotter.plot(data);

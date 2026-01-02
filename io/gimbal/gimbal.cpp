@@ -11,11 +11,10 @@ Gimbal::Gimbal(const std::string & config_path)
 {
   auto yaml = tools::load(config_path);
   auto com_port = tools::read<std::string>(yaml, "com_port");
-
+  auto baud_rate = tools::read<int>(yaml, "baud_rate");
   try {
     serial_.setPort(com_port);
-    // 设置串口参数，确保与设备匹配
-    serial_.setBaudrate(115200); // 根据实际设备调整
+    serial_.setBaudrate(baud_rate); 
     serial::Timeout timeout = serial::Timeout::simpleTimeout(100);
     serial_.setTimeout(timeout);
     serial_.open();
@@ -27,6 +26,17 @@ Gimbal::Gimbal(const std::string & config_path)
   thread_ = std::thread(&Gimbal::read_thread, this);
 
   tools::logger()->info("[Gimbal] Initialized successfully.");
+  // 初始化data_ahead_和data_behind_
+  if (!queue_.empty()) {
+  queue_.pop(data_ahead_);
+  if (!queue_.empty()) {
+    queue_.pop(data_behind_);
+    queue_.push(data_behind_); // 将data_behind_放回队列
+  } else {
+    data_behind_ = data_ahead_;
+  }
+  queue_.push(data_ahead_); // 将data_ahead_放回队列
+}
 }
 
 Gimbal::~Gimbal()
@@ -66,11 +76,57 @@ std::string Gimbal::str(GimbalMode mode) const
 
 Eigen::Quaterniond Gimbal::q(std::chrono::steady_clock::time_point t)
 {
-  std::lock_guard<std::mutex> lock(mutex_);
-  // 从yaw和pitch创建四元数（Z-Y-X旋转顺序）
-  Eigen::Quaterniond q = Eigen::AngleAxisd(state_.yaw, Eigen::Vector3d::UnitZ()) *
-                        Eigen::AngleAxisd(state_.pitch, Eigen::Vector3d::UnitY());
-  return q.normalized();
+  if (queue_.empty()) {
+    // 队列空，返回当前状态的四元数
+    std::lock_guard<std::mutex> lock(mutex_);
+    Eigen::Quaterniond q = Eigen::AngleAxisd(state_.yaw, Eigen::Vector3d::UnitZ()) *
+                          Eigen::AngleAxisd(state_.pitch, Eigen::Vector3d::UnitY());
+    return q.normalized();
+  }
+
+  // 查找最接近的两个数据点
+  std::vector<std::tuple<Eigen::Quaterniond, std::chrono::steady_clock::time_point>> temp_queue;
+  std::tuple<Eigen::Quaterniond, std::chrono::steady_clock::time_point> q_a, q_b;
+  bool found = false;
+
+  // 临时存储队列数据以便查找
+  while (!queue_.empty()) {
+    auto data = queue_.pop();
+    temp_queue.push_back(data);
+    
+    if (std::get<1>(data) <= t) {
+      q_a = data;
+    } else if (std::get<1>(data) > t && std::get<1>(q_a) <= t) {
+      q_b = data;
+      found = true;
+      break;
+    }
+  }
+
+  // 恢复队列数据
+  for (auto & data : temp_queue) {
+    queue_.push(data);
+  }
+
+  if (!found) {
+    // 没有找到合适的两个点，返回最接近的点
+    if (temp_queue.empty()) {
+      std::lock_guard<std::mutex> lock(mutex_);
+      Eigen::Quaterniond q = Eigen::AngleAxisd(state_.yaw, Eigen::Vector3d::UnitZ()) *
+                            Eigen::AngleAxisd(state_.pitch, Eigen::Vector3d::UnitY());
+      return q.normalized();
+    }
+    return std::get<0>(temp_queue.back());
+  }
+
+  // 计算时间差
+  double t_ab = tools::delta_time(std::get<1>(q_b), std::get<1>(q_a));
+  double t_ac = tools::delta_time(t, std::get<1>(q_a));
+  double k = t_ac / t_ab;
+
+  // 使用SLERP进行插值
+  Eigen::Quaterniond q_c = std::get<0>(q_a).slerp(k, std::get<0>(q_b));
+  return q_c.normalized();
 }
 
 void Gimbal::send(io::VisionToGimbal VisionToGimbal)
@@ -119,7 +175,7 @@ bool Gimbal::read(uint8_t * buffer, size_t size)
   try {
     return serial_.read(buffer, size) == size;
   } catch (const std::exception & e) {
-    // tools::logger()->warn("[Gimbal] Failed to read serial: {}", e.what());
+     tools::logger()->warn("[Gimbal] Failed to read serial: {}", e.what());
     return false;
   }
 }
@@ -172,6 +228,11 @@ void Gimbal::read_thread()
     float temp_pitch_vel = rx_data_.pitch_vel;
     float temp_bullet_speed = rx_data_.bullet_speed;
     uint8_t temp_mode = rx_data_.mode;
+    
+    // 创建四元数并存储到队列
+    Eigen::Quaterniond q = Eigen::AngleAxisd(temp_yaw, Eigen::Vector3d::UnitZ()) *
+                          Eigen::AngleAxisd(temp_pitch, Eigen::Vector3d::UnitY());
+    queue_.push(std::make_tuple(q.normalized(), t));
     
     std::lock_guard<std::mutex> lock(mutex_);
 
