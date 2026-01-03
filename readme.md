@@ -73,7 +73,7 @@
 
 将获取的内参和畸变系数放入calibration.yaml以供手眼标定使用
 ### 3.手眼标定(获取相机到gimbal的变换矩阵)
-    ./build/aclibrate_handeye
+    ./build/calibrate_handeye
 ### 手眼标定程序(同时计算标定板位置)
     ./build/calibrate_robotworld_handeye
 # 自启动设置

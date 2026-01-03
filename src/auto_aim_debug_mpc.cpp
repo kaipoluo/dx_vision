@@ -66,19 +66,19 @@ int main(int argc, char * argv[])
       nlohmann::json data;
       data["t"] = tools::delta_time(std::chrono::steady_clock::now(), t0);
 
-      data["gimbal_yaw"] = gs.yaw;
+      data["gimbal_yaw"] = gs.yaw * 57.2958;
       //data["gimbal_yaw_vel"] = gs.yaw_vel;
-      data["gimbal_pitch"] = gs.pitch;
+      data["gimbal_pitch"] = gs.pitch * 57.2958;
       //data["gimbal_pitch_vel"] = gs.pitch_vel;
 
-      data["target_yaw"] = plan.target_yaw;
-      data["target_pitch"] = plan.target_pitch;
+      data["target_yaw"] = plan.target_yaw* 57.2958;
+      data["target_pitch"] = plan.target_pitch* 57.2958;
 
-      data["plan_yaw"] = plan.yaw;
+      data["plan_yaw"] = plan.yaw* 57.2958;
       // data["plan_yaw_vel"] = plan.yaw_vel;
       // data["plan_yaw_acc"] = plan.yaw_acc;
 
-      data["plan_pitch"] = plan.pitch;
+      data["plan_pitch"] = plan.pitch* 57.2958;
       // data["plan_pitch_vel"] = plan.pitch_vel;
       // data["plan_pitch_acc"] = plan.pitch_acc;
 
