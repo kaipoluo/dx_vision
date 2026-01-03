@@ -39,7 +39,7 @@ outpost_max_temp_lost_count: 75
 
 #####-----aimer参数-----#####
 yaw_offset: -2.5 # degree -2.5
-pitch_offset: 0 # degree 2
+pitch_offset: 2 # degree 2
 comming_angle: 60 # degree
 leaving_angle: 20 # degree
 decision_speed: 8 # rad/s
@@ -53,14 +53,9 @@ judge_distance: 2 #距离判断阈值
 auto_fire: true # 是否由自瞄控制射击
 
 camera_name: "hikrobot"
-exposure_ms: 2
+exposure_ms: 5
 gain: 16
 vid_pid: "2bdf:0001"
-
-# camera_name: "dahengvision"
-# exposure_ms: 10
-# gamma: 1.0
-# vid_pid: "2ba2:4d55"
 
 #  1  0  0
 #  0  1  0
@@ -68,12 +63,18 @@ vid_pid: "2bdf:0001"
 
 R_gimbal2imubody: [1, 0, 0, 0, 1, 0, 0, 0, 1]
 
-# 重投影误差: 0.3145px
-camera_matrix: [1851.7070167840545, 0, 721.12585328714192, 0, 1851.8175594364079, 571.69879709276688, 0, 0, 1]
-distort_coeffs: [-0.093662536083526302, 0.189457268206333155, -0.00040424349861928674, -0.0040568403852123142, 0]
+# 重投影误差: 0.1030px
+camera_matrix: [2411.9972537905574, 0, 711.46224595997876, 0, 2411.4974164117752, 532.05928957356673, 0, 0, 1]
+distort_coeffs: [-0.028383139506372255, 0.15174874881063216, -0.00093145156762778562, 0.0016975714249690349, 0]
 # 相机同理想情况的偏角: yaw0.02 pitch1.94 roll1.40 degree
 R_camera2gimbal: [0.00046423063676173171, 0.033770528223625203, 0.99942950522456209, -0.99970300483287733, 0.024367462669785803, -0.00035901413901253575, -0.02436568525675643, -0.99913251282626891, 0.03377181066266309]
 t_camera2gimbal: [-0.034955523715399906, -0.000074403211899371, 0.001248173910106823]
+
+#####-----cboard参数-----#####
+# quaternion_canid: 0x100
+# bullet_speed_canid: 0x101
+# send_canid: 0xff
+# can_interface: "can0"
 
 #####-----gimbal参数-----#####
 com_port: "/dev/ttyACM0"
@@ -93,7 +94,8 @@ max_pitch_acc: 100
 Q_pitch: [9e6,0]
 R_pitch: [1]
 
-
+#####-----buff_detector参数-----#####
+model: "assets/yolo11_buff_int8.xml"
 
 #####-----buff_aimer参数-----#####
 fire_gap_time: 0.520   # s
