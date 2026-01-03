@@ -217,7 +217,7 @@ void DahengVision::open()
                          // 水平+垂直翻转
                         cv::flip(bayer_img, bayer_img, -1);  // 水平+垂直翻转
                         cv::Mat rgb_img;
-                        cv::cvtColor(bayer_img, rgb_img, cv::COLOR_BayerBG2BGR);
+                        cv::cvtColor(bayer_img, rgb_img, cv::COLOR_BayerRG2BGR);
         
                         // 存入线程安全队列
                         CameraData data;
