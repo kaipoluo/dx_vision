@@ -151,7 +151,7 @@ void Gimbal::send(io::VisionToGimbal VisionToGimbal)
 
 void Gimbal::send(
   bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
-  float pitch_acc)
+  float pitch_acc, bool is_empty)
 {
   tx_data_.mode = control ? (fire ? 2 : 1) : 0;
   tx_data_.yaw = yaw;
@@ -160,6 +160,8 @@ void Gimbal::send(
   tx_data_.pitch = pitch;
   tx_data_.pitch_vel = pitch_vel;
   tx_data_.pitch_acc = pitch_acc;
+  tx_data_.shoot = fire;
+  tx_data_.is_empty = is_empty;
   tx_data_.crc16 = tools::get_crc16(
     reinterpret_cast<uint8_t *>(&tx_data_), sizeof(tx_data_) - sizeof(tx_data_.crc16));
 
@@ -212,7 +214,7 @@ void Gimbal::read_thread()
       continue;
     }
 
-    // 直接从packed结构体复制值到临时变量，避免绑定问题
+    // 直接从packed结构体复制值到临时变量，输出错误情况
     uint16_t temp_crc16 = rx_data_.crc16;
     if (!tools::check_crc16(reinterpret_cast<uint8_t *>(&rx_data_), sizeof(rx_data_))) {
       tools::logger()->debug("[Gimbal] CRC16 check failed.RX:{}", temp_crc16);

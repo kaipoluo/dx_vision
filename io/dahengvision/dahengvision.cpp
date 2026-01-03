@@ -8,7 +8,7 @@ namespace io
 DahengVision::DahengVision(double exposure_ms, double gamma, const std::string & vid_pid)
     : exposure_ms_(exposure_ms),
       gamma_(gamma),
-      queue_(100),  // 添加max_size参数
+      queue_(1),  // 队列大小设为1，确保单帧处理
       handle_(nullptr),
       height_(0),
       width_(0),
@@ -96,6 +96,9 @@ void DahengVision::reset_usb() const
 // 打开相机：初始化SDK + 枚举设备 + 配置参数 + 启动采集线程
 void DahengVision::open()
 {
+    // 先关闭日志
+    GXSetLogType(GX_LOG_TYPE_OFF);
+
     // 初始化SDK
     GX_STATUS status = GXInitLib();
     if (status != GX_STATUS_SUCCESS)
@@ -103,9 +106,6 @@ void DahengVision::open()
         tools::logger()->error("SDK initialization failed, error code: {}", status);
         return;
     }
-
-    // 禁用大恒相机的日志输出
-    GXSetLogType(GX_LOG_TYPE_OFF);
 
     // 枚举设备
     uint32_t device_num = 0;
@@ -193,16 +193,14 @@ void DahengVision::open()
             GXSetIntValue(data_stream, "ResendTimeout", 200);  // 重传超时200ms
         }
 
-        // 7. 设置设备级图像翻转,适配倒装的相机
-        GXSetBool(handle_, GX_BOOL_REVERSE_X, true);  // 水平翻转
-        GXSetBool(handle_, GX_BOOL_REVERSE_Y, true);  // 垂直翻转
+        
 
-        // 8. 启动流传输（Linux专用）
+        // 7. 启动流传输（Linux专用）
         status = GXStreamOn(handle_);
         if (status != GX_STATUS_SUCCESS)
             throw std::runtime_error("Failed to start stream transmission");
         
-        // 9. 启动采集线程（流传输启动后再启动采集线程）
+        // 8. 启动采集线程（流传输启动后再启动采集线程）
         ok_ = true;
         capture_thread_ = std::thread([this]() {
             GX_FRAME_BUFFER* frame_buffer = nullptr;
@@ -216,6 +214,8 @@ void DahengVision::open()
                     {
                         // BayerBG8转RGB，但直接转换为BGR以解决红蓝颠倒问题
                         cv::Mat bayer_img(height_, width_, CV_8UC1, frame_buffer->pImgBuf);
+                         // 水平+垂直翻转
+                        cv::flip(bayer_img, bayer_img, -1);  // 水平+垂直翻转
                         cv::Mat rgb_img;
                         cv::cvtColor(bayer_img, rgb_img, cv::COLOR_BayerBG2BGR);
         

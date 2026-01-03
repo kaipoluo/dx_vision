@@ -2,15 +2,21 @@
 操作系统：Ubuntu 22.04\
 运算平台：intel NUC()\
 相机型号：海康MV-CS016-10UC 大恒MER-139-210U3C\
-镜头型号：海康官方6mm镜头 大恒相机6mm\
+镜头型号：海康官方6mm镜头 大恒相机6mm镜头\
 与下位机通信：gimbal：串口
 # 运行步兵自瞄
+## mpc模式debug模式
 
-    debug模式
-    ./build/auto_aim_debug_mpc ./configs/standard4.yaml
-    ./build/mt_auto_aim_debug ./configs/standard4.yaml
-    release
-    ./build/mt_standard ./configs/standard4.yaml
+### 3V3:
+
+    ./build/auto_aim_debug_mpc ./configs/standard1.yaml
+### 1V1:
+
+     ./build/auto_aim_debug_mpc ./configs/standard3.yaml
+### 多线程模式:(弃用)
+    ./build/mt_auto_aim_debug ./configs/standard1.yaml
+## 标准模式:
+    
 
 # 相机测试
 ### 相机画面测试
@@ -98,7 +104,7 @@
 ### 如遇到大恒相机链接问题
 大恒相机库文件路径添加到环境变量LD_LIBRARY_PATH中，确保系统能找到相机驱动库文件
 ```bash
-link export LD_LIBRARY_PATH=./io/dahengvision/lib/amd64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=./io/dahengvision/lib/amd64:$LD_LIBRARY_PATH
 ```
 ```bash
 echo 'export LD_LIBRARY_PATH=/home/ning/桌面/dx_vision/io/dahengvision/lib/amd64:$LD_LIBRARY_PATH' >> ~/.bashrc

@@ -23,7 +23,7 @@ using namespace std::chrono_literals;
 
 const std::string keys =
   "{help h usage ? |                        | 输出命令行参数说明}"
-  "{@config-path   | configs/sentry.yaml | 位置参数，yaml配置文件路径 }";
+  "{@config-path   | configs/standard1.yaml | 位置参数，yaml配置文件路径 }";
 
 int main(int argc, char * argv[])
 {
@@ -51,42 +51,39 @@ int main(int argc, char * argv[])
   std::atomic<bool> quit = false;
   auto plan_thread = std::thread([&]() {
     auto t0 = std::chrono::steady_clock::now();
-    // 移除last_bullet_count变量
+    
     
     while (!quit) {
       auto target = target_queue.front();
       auto gs = gimbal.state();
       auto plan = planner.plan(target, gs.bullet_speed);
-
+      auto is_empty = target.has_value() ? false : true;
       gimbal.send(
         plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
-        plan.pitch_acc);
+        plan.pitch_acc, is_empty);
 
-      // 修改fired变量定义，因为没有bullet_count来检测射击了
-      auto fired = false; // 简单处理，因为没有bullet_count了
-      // 移除对gs.bullet_count的赋值
-
+      
       nlohmann::json data;
       data["t"] = tools::delta_time(std::chrono::steady_clock::now(), t0);
 
       data["gimbal_yaw"] = gs.yaw;
-      data["gimbal_yaw_vel"] = gs.yaw_vel;
+      //data["gimbal_yaw_vel"] = gs.yaw_vel;
       data["gimbal_pitch"] = gs.pitch;
-      data["gimbal_pitch_vel"] = gs.pitch_vel;
+      //data["gimbal_pitch_vel"] = gs.pitch_vel;
 
       data["target_yaw"] = plan.target_yaw;
       data["target_pitch"] = plan.target_pitch;
 
       data["plan_yaw"] = plan.yaw;
-      data["plan_yaw_vel"] = plan.yaw_vel;
-      data["plan_yaw_acc"] = plan.yaw_acc;
+      // data["plan_yaw_vel"] = plan.yaw_vel;
+      // data["plan_yaw_acc"] = plan.yaw_acc;
 
       data["plan_pitch"] = plan.pitch;
-      data["plan_pitch_vel"] = plan.pitch_vel;
-      data["plan_pitch_acc"] = plan.pitch_acc;
+      // data["plan_pitch_vel"] = plan.pitch_vel;
+      // data["plan_pitch_acc"] = plan.pitch_acc;
 
       data["fire"] = plan.fire ? 1 : 0;
-      data["fired"] = fired ? 1 : 0;
+      data["is_empty"] = is_empty ? 1 : 0;
 
       if (target.has_value()) {
         data["target_z"] = target->ekf_x()[4];   //z
@@ -145,7 +142,7 @@ int main(int argc, char * argv[])
 
   quit = true;
   if (plan_thread.joinable()) plan_thread.join();
-  gimbal.send(false, false, 0, 0, 0, 0, 0, 0);
+  gimbal.send(false, false, 0, 0, 0, 0, 0, 0, true);
 
   return 0;
 }

@@ -75,10 +75,10 @@ public:
   GimbalState state() const;
   std::string str(GimbalMode mode) const;
   Eigen::Quaterniond q(std::chrono::steady_clock::time_point t);
-  Eigen::Quaterniond imu_at(std::chrono::steady_clock::time_point t);
+  
   void send(
     bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
-    float pitch_acc);
+    float pitch_acc, bool is_empty = false);
 
   void send(io::VisionToGimbal VisionToGimbal);
 
