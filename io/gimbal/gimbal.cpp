@@ -103,6 +103,7 @@ void Gimbal::send(
   tx_data_.pitch = pitch;
   tx_data_.pitch_vel = pitch_vel;
   tx_data_.pitch_acc = pitch_acc;
+  tx_data_.shoot = fire;
   tx_data_.crc16 = tools::get_crc16(
     reinterpret_cast<uint8_t *>(&tx_data_), sizeof(tx_data_) - sizeof(tx_data_.crc16));
 

@@ -66,19 +66,19 @@ int main(int argc, char * argv[])
       nlohmann::json data;
       data["t"] = tools::delta_time(std::chrono::steady_clock::now(), t0);
 
-      data["gimbal_yaw"] = gs.yaw * 57.2958;
+      data["gimbal_yaw"] = gs.yaw * 57.2958; // 世界坐标系中云台当前yaw角度（单位：度）
       //data["gimbal_yaw_vel"] = gs.yaw_vel;
-      data["gimbal_pitch"] = gs.pitch * 57.2958;
+      data["gimbal_pitch"] = gs.pitch * 57.2958; // 世界坐标系中云台当前pitch角度（单位：度）
       //data["gimbal_pitch_vel"] = gs.pitch_vel;
 
-      data["target_yaw"] = plan.target_yaw* 57.2958;
-      data["target_pitch"] = plan.target_pitch* 57.2958;
+      data["target_yaw"] = plan.target_yaw* 57.2958; //目标在世界坐标系中的yaw角度（单位：度）
+      data["target_pitch"] = plan.target_pitch* 57.2958; //目标在世界坐标系中的pitch角度（单位：度）
 
-      data["plan_yaw"] = plan.yaw* 57.2958;
+      data["plan_yaw"] = plan.yaw* 57.2958; // 期望在世界坐标系中的yaw角度（单位：度）
       // data["plan_yaw_vel"] = plan.yaw_vel;
       // data["plan_yaw_acc"] = plan.yaw_acc;
 
-      data["plan_pitch"] = plan.pitch* 57.2958;
+      data["plan_pitch"] = plan.pitch* 57.2958; // 期望在世界坐标系中的pitch角度（单位：度）
       // data["plan_pitch_vel"] = plan.pitch_vel;
       // data["plan_pitch_acc"] = plan.pitch_acc;
 
@@ -86,8 +86,8 @@ int main(int argc, char * argv[])
       data["is_empty"] = is_empty ? 1 : 0;
 
       if (target.has_value()) {
-        data["target_z"] = target->ekf_x()[4];   //z
-        data["target_vz"] = target->ekf_x()[5];  //vz
+        data["target_z"] = target->ekf_x()[4];   //z目标在世界坐标系中的z轴位置坐标
+        data["target_vz"] = target->ekf_x()[5];  //vz目标在z轴方向的速度分量
       }
 
       if (target.has_value()) {

@@ -95,7 +95,7 @@ Plan Planner::plan(Target target, double bullet_speed)
 
 Plan Planner::plan(std::optional<Target> target, double bullet_speed)
 {
-  if (!target.has_value()) return {false};
+  if (!target.has_value()) return {false}; //c++聚合初始化,plan的数据字段均为false或0
 
   double delay_time =
     std::abs(target->ekf_x()[7]) > decision_speed_ ? high_speed_delay_time_ : low_speed_delay_time_;
