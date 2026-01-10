@@ -24,6 +24,12 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
   max_temp_lost_count_ = yaml["max_temp_lost_count"].as<int>();
   outpost_max_temp_lost_count_ = yaml["outpost_max_temp_lost_count"].as<int>();
   normal_temp_lost_count_ = max_temp_lost_count_;
+  
+  // 从配置文件读取相机矩阵并计算图像中心坐标
+  auto camera_matrix_data = yaml["camera_matrix"].as<std::vector<double>>();
+  double cx = camera_matrix_data[2]; // 相机矩阵的第3个元素为图像中心x坐标
+  double cy = camera_matrix_data[5]; // 相机矩阵的第6个元素为图像中心y坐标
+  img_center_ = cv::Point2f(cx, cy);
 }
 
 std::string Tracker::state() const { return state_; }
@@ -50,10 +56,9 @@ std::list<Target> Tracker::track(
   // });
 
   // 优先选择靠近图像中心的装甲板
-  armors.sort([](const Armor & a, const Armor & b) {
-    cv::Point2f img_center(1440 / 2, 1080 / 2);  // TODO
-    auto distance_1 = cv::norm(a.center - img_center);
-    auto distance_2 = cv::norm(b.center - img_center);
+  armors.sort([this](const Armor & a, const Armor & b) {
+    auto distance_1 = cv::norm(a.center - img_center_);
+    auto distance_2 = cv::norm(b.center - img_center_);
     return distance_1 < distance_2;
   });
 

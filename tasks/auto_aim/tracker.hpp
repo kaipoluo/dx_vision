@@ -42,6 +42,7 @@ private:
   Target target_;
   std::chrono::steady_clock::time_point last_timestamp_;
   ArmorPriority omni_target_priority_;
+  cv::Point2f img_center_; // 图像中心坐标
 
   void state_machine(bool found);
 
