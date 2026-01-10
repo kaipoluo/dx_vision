@@ -9,10 +9,10 @@
 
 ### 3V3:
 
-    ./build/auto_aim_debug_mpc ./configs/standard1.yaml
+    ./build/auto_aim_debug_mpc ./configs/standard3.yaml
 ### 1V1:
 
-     ./build/auto_aim_debug_mpc ./configs/standard3.yaml
+     ./build/auto_aim_debug_mpc ./configs/standard1.yaml
 ### 多线程模式:(弃用)
     ./build/mt_auto_aim_debug ./configs/standard1.yaml
 ## 标准模式:
@@ -21,13 +21,14 @@
 # 相机测试
 ### 相机画面测试
     ./build/camera_test configs/camera.yaml -d
+    ./build/camera_test configs/standard1.yaml -d
     参数说明：
     -c 或 --config-path: 指定相机配置文件的路径\
     -d: 显示视频流\
     -h 或 --help: 显示帮助信息
 ### 相机自瞄测试
     ./build/camera_auto_aim_test configs camera_auto_aim.yaml
-
+    ./build/camera_auto_aim_test configs/standard1.yaml 
 ## 串口gimbal测试
 ### 串口收发测试
     ./build/gimbal_test configs/standard4.yaml
