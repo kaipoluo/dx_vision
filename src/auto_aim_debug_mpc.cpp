@@ -85,6 +85,7 @@ int main(int argc, char * argv[])
       data["fire"] = plan.fire ? 1 : 0;
       data["is_empty"] = is_empty ? 1 : 0;
 
+      data["mode"] = plan.control ? (plan.fire ? 2 : 1) : 0;
       if (target.has_value()) {
         data["target_z"] = target->ekf_x()[4];   //z目标在世界坐标系中的z轴位置坐标
         data["target_vz"] = target->ekf_x()[5];  //vz目标在z轴方向的速度分量
