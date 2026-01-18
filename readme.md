@@ -108,6 +108,6 @@
 export LD_LIBRARY_PATH=./io/dahengvision/lib/amd64:$LD_LIBRARY_PATH
 ```
 ```bash
-echo 'export LD_LIBRARY_PATH=/home/ning/桌面/dx_vision/io/dahengvision/lib/amd64:$LD_LIBRARY_PATH' >> ~/.bashrc
+echo 'export LD_LIBRARY_PATH=/home/rm3/桌面/dx_vision/io/dahengvision/lib/amd64:$LD_LIBRARY_PATH' >> ~/.bashrc
 source ~/.bashrc
 ```
