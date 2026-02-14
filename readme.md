@@ -88,11 +88,11 @@
      mkdir ~/.config/autostart/
     touch ~/.config/autostart/dx_vision.desktop
     ```
-3. 在该文件中写入:
+3. 在`.desktop`文件中写入:
     ```
     [Desktop Entry]
     Type=Application
-    Exec=/home/ning/桌面/dx_vision/autostart.sh
+    Exec=/home/rm3/桌面/dx_vision/autostart.sh
     Name=dx_vision
     ```
     注: [Exec](https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html)必须为绝对路径.
@@ -100,7 +100,16 @@
     ```
     chmod +x autostart.sh
     ```
+5. 系统启动后执行`autostart.sh`脚本.
 
+    `autostart.sh`脚本中包含启动`watchdog.sh`看门狗脚本(守护进程).
+
+    在`watchdog.sh`脚本中,更改脚本在目录`/home/rm3/桌面/dx_vision/`(用户名称要改)下执行.
+6. 系统启动后，检查`screen`会话是否自动启动:
+    ```
+    screen -ls
+    ```
+    应能看到`dx_vision`会话.
 
 ### 如遇到大恒相机链接问题
 大恒相机库文件路径添加到环境变量LD_LIBRARY_PATH中，确保系统能找到相机驱动库文件

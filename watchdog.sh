@@ -2,7 +2,7 @@
 #!/bin/bash
 
 # 进入脚本所在目录
-cd /home/ning/桌面/dx_vision/ || exit 1
+cd /home/rm3/桌面/dx_vision/ || exit 1
 
 # 进程崩溃重启上限
 MAX_RETRY=100
@@ -30,7 +30,7 @@ while true; do
     sleep 1
 
     # 启动程序（后台运行）
-    ./build/standard ./configs/swerve.yaml 2>&1 &
+    ../build/auto_aim_debug_mpc ./configs/standard3.yaml 2>&1 &
 
   else
     # 进程运行正常时重置崩溃计数器
