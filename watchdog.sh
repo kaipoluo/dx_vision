@@ -1,4 +1,3 @@
-@@ -0,0 +1,40 @@
 #!/bin/bash
 
 # 进入脚本所在目录
@@ -17,9 +16,9 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 while true; do
-  # 检查 standard 进程是否存在
-  if ! pidof standard > /dev/null; then
-    echo "standard 未运行，正在重启..."
+  # 检查 auto_aim_debug_mpc 进程是否存在
+  if ! pidof auto_aim_debug_mpc > /dev/null; then
+    echo "auto_aim_debug_mpc 未运行，正在重启..."
 
     RETRY_COUNT=$((RETRY_COUNT + 1))
     if [ "$RETRY_COUNT" -gt "$MAX_RETRY" ]; then
@@ -30,7 +29,7 @@ while true; do
     sleep 1
 
     # 启动程序（后台运行）
-    ../build/auto_aim_debug_mpc ./configs/standard3.yaml 2>&1 &
+    ./build/auto_aim_debug_mpc ./configs/standard3.yaml 2>&1 &
 
   else
     # 进程运行正常时重置崩溃计数器
