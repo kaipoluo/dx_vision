@@ -78,7 +78,7 @@ public:
   
   void send(
     bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
-    float pitch_acc, bool is_empty = false);
+    float pitch_acc, bool is_empty = true);
 
   void send(io::VisionToGimbal VisionToGimbal);
 

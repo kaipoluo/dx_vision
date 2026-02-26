@@ -51,34 +51,34 @@ int main(int argc, char * argv[])
   std::atomic<bool> quit = false;
   auto plan_thread = std::thread([&]() {
     auto t0 = std::chrono::steady_clock::now();
-    
-    
+
     while (!quit) {
       auto target = target_queue.front();
       auto gs = gimbal.state();
       auto plan = planner.plan(target, gs.bullet_speed);
       auto is_empty = target.has_value() ? false : true;
+
       gimbal.send(
         plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
         plan.pitch_acc, is_empty);
 
-      
       nlohmann::json data;
       data["t"] = tools::delta_time(std::chrono::steady_clock::now(), t0);
 
-      data["gimbal_yaw"] = gs.yaw * 57.2958; // 世界坐标系中云台当前yaw角度（单位：度）
+      data["gimbal_yaw"] = gs.yaw * 57.2958;  // 世界坐标系中云台当前yaw角度（单位：度）
       //data["gimbal_yaw_vel"] = gs.yaw_vel;
-      data["gimbal_pitch"] = gs.pitch * 57.2958; // 世界坐标系中云台当前pitch角度（单位：度）
+      data["gimbal_pitch"] = gs.pitch * 57.2958;  // 世界坐标系中云台当前pitch角度（单位：度）
       //data["gimbal_pitch_vel"] = gs.pitch_vel;
 
-      data["target_yaw"] = plan.target_yaw* 57.2958; //目标在世界坐标系中的yaw角度（单位：度）
-      data["target_pitch"] = plan.target_pitch* 57.2958; //目标在世界坐标系中的pitch角度（单位：度）
+      data["target_yaw"] = plan.target_yaw * 57.2958;  //目标在世界坐标系中的yaw角度（单位：度）
+      data["target_pitch"] =
+        plan.target_pitch * 57.2958;  //目标在世界坐标系中的pitch角度（单位：度）
 
-      data["plan_yaw"] = plan.yaw* 57.2958; // 期望在世界坐标系中的yaw角度（单位：度）
+      data["plan_yaw"] = plan.yaw * 57.2958;  // 期望在世界坐标系中的yaw角度（单位：度）
       // data["plan_yaw_vel"] = plan.yaw_vel;
       // data["plan_yaw_acc"] = plan.yaw_acc;
 
-      data["plan_pitch"] = plan.pitch* 57.2958; // 期望在世界坐标系中的pitch角度（单位：度）
+      data["plan_pitch"] = plan.pitch * 57.2958;  // 期望在世界坐标系中的pitch角度（单位：度）
       // data["plan_pitch_vel"] = plan.pitch_vel;
       // data["plan_pitch_acc"] = plan.pitch_acc;
 
@@ -118,7 +118,7 @@ int main(int argc, char * argv[])
     else
       target_queue.push(std::nullopt);
 
-    if (!targets.empty()) {
+    if (!targets.empty()) {//绘制目标投影
       auto target = targets.front();
 
       // 当前帧target更新后
