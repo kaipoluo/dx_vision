@@ -47,13 +47,14 @@ io::Command Aimer::aim(
   if (to_now) {
     double dt;
     dt = tools::delta_time(std::chrono::steady_clock::now(), timestamp) + delay_time;
+    tools::logger()->info("dt is {:.4f} second", dt);
     future += std::chrono::microseconds(int(dt * 1e6));
     target.predict(future);
   }
 
   else {
     auto dt = 0.005 + delay_time;  //detector-aimer耗时0.005+发弹延时0.1
-    // tools::logger()->info("dt is {:.4f} second", dt);
+     tools::logger()->info("dt is {:.4f} second", dt);
     future += std::chrono::microseconds(int(dt * 1e6));
     target.predict(future);
   }
@@ -61,7 +62,7 @@ io::Command Aimer::aim(
   auto aim_point0 = choose_aim_point(target);
   debug_aim_point = aim_point0;
   if (!aim_point0.valid) {
-    // tools::logger()->debug("Invalid aim_point0.");
+    tools::logger()->debug("Invalid aim_point0.");
     return {false, false, 0, 0};
   }
 
@@ -75,13 +76,13 @@ io::Command Aimer::aim(
     return {false, false, 0, 0};
   }
 
-  // 迭代求解飞行时间 (最多10次，收敛条件：相邻两次fly_time差 <0.001)
+  // 迭代求解飞行时间 (最多20次，收敛条件：相邻两次fly_time差 <0.001)
   bool converged = false;
   double prev_fly_time = trajectory0.fly_time;
   tools::Trajectory current_traj = trajectory0;
-  std::vector<Target> iteration_target(10, target);  // 创建10个目标副本用于迭代预测
+  std::vector<Target> iteration_target(20, target);  // 创建20个目标副本用于迭代预测
 
-  for (int iter = 0; iter < 10; ++iter) {
+  for (int iter = 0; iter < 20; ++iter) {  // 迭代次数从10增加到20
     // 预测目标在 future + prev_fly_time 时刻的位置
     auto predict_time = future + std::chrono::microseconds(static_cast<int>(prev_fly_time * 1e6));
     iteration_target[iter].predict(predict_time);

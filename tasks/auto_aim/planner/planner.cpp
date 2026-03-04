@@ -99,6 +99,15 @@ Plan Planner::plan(std::optional<Target> target, double bullet_speed)
 
   double delay_time =
     std::abs(target->ekf_x()[7]) > decision_speed_ ? high_speed_delay_time_ : low_speed_delay_time_;
+  
+  // // 增加延迟时间以提高预测精度
+  // // 可以根据目标速度动态调整延迟时间的系数
+  // double dynamic_delay_factor = 1.2; // 可以根据测试结果调整这个系数
+  // //delay_time *= dynamic_delay_factor;
+  
+  // // 添加动态延迟时间日志
+  // tools::logger()->info("Dynamic delay time: {:.4f} second (base: {:.4f}, factor: {:.2f})", 
+  //                       delay_time, high_speed_delay_time_, dynamic_delay_factor);
 
   auto future = std::chrono::steady_clock::now() + std::chrono::microseconds(int(delay_time * 1e6));
 
