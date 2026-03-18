@@ -105,11 +105,14 @@ int main(int argc, char * argv[])
 
   cv::Mat img;
   std::chrono::steady_clock::time_point t;
-
+  auto last_timestamp = std::chrono::steady_clock::now();  // 添加这一行，初始化上一帧时间戳
   while (!exiter.exit()) {
     camera.read(img, t);
     auto q = gimbal.q(t);
-
+    // 帧率计算和打印
+    auto dt = tools::delta_time(t, last_timestamp);
+    last_timestamp = t;
+    tools::logger()->info("相机帧率: {:.2f} fps", 1.0 / dt);
     solver.set_R_gimbal2world(q);
     auto armors = yolo.detect(img);
     auto targets = tracker.track(armors, t);

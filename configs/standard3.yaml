@@ -38,23 +38,6 @@ max_temp_lost_count: 15
 outpost_max_temp_lost_count: 75
 
 #####-----aimer参数-----#####
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 yaw_offset: -0.75 # degree -2.5 +  left     - right -2.4   -0.75
 pitch_offset: 0 # degree 2 正值：瞄准点向down偏移 负值：瞄准点向up偏移  -2.5
 comming_angle: 60 # degree
@@ -75,7 +58,7 @@ auto_fire: true # 是否由自瞄控制射击
 # vid_pid: "2bdf:0001"
 
 camera_name: "dahengvision"
-exposure_ms: 40
+exposure_ms: 100
 gamma: 1.0
 vid_pid: "2ba2:4d55"
 
@@ -119,9 +102,3 @@ R_yaw: [100]
 max_pitch_acc: 50
 Q_pitch: [9e6,100] #响应精度
 R_pitch: [200] #平滑精度
-
-
-
-#####-----buff_aimer参数-----#####
-fire_gap_time: 0.520   # s
-predict_time: 0.100     # s
