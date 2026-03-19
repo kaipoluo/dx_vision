@@ -120,3 +120,67 @@ export LD_LIBRARY_PATH=./io/dahengvision/lib/amd64:$LD_LIBRARY_PATH
 echo 'export LD_LIBRARY_PATH=/home/rm3/桌面/dx_vision/io/dahengvision/lib/amd64:$LD_LIBRARY_PATH' >> ~/.bashrc
 source ~/.bashrc
 ```
+
+# 依赖安装
+## openvino安装
+[OpenVINO](https://www.intel.cn/content/dam/develop/public/cn/zh/include/openvino-download/v_2024_6_0-15432eb/selector-15432eb.html?PACKAGE=OPENVINO_BASE&VERSION=v_2024_6_0&OP_SYSTEM=LINUX&DISTRIBUTION=APT)
+#### 第 1 步：下载 GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB。您也可以使用以下命令
+    wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+#### 第 2 步：将此密钥添加到系统密钥环。
+    sudo apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+#### 第 3 步：通过以下命令添加存储库。
+
+##### Ubuntu 22
+    echo "deb https://apt.repos.intel.com/openvino/2024 ubuntu22 main" | sudo tee /etc/apt/sources.list.d/intel-openvino-2024.list
+#### 第 4 步：使用更新命令更新软件包列表。
+    sudo apt update
+#### 第 5 步：验证 APT 存储库的设置是否正确。使用 apt-cache 命令查看包含所有可用 OpenVINO 程序包和组件的列表
+    apt-cache search openvino
+#### 第 6 步：安装 OpenVINO 运行时。
+    sudo apt install openvino-2024.6.0
+
+## [Ceres](http://ceres-solver.org/installation.html)
+
+### 首先安装所有依赖。
+```bash
+# CMake
+sudo apt-get install cmake
+# google-glog + gflags
+sudo apt-get install libgoogle-glog-dev libgflags-dev
+# Use ATLAS for BLAS & LAPACK
+sudo apt-get install libatlas-base-dev
+# Eigen3
+sudo apt-get install libeigen3-dev
+# SuiteSparse (optional)
+sudo apt-get install libsuitesparse-dev
+```
+### 建造、测试并安装Ceres。
+```bash
+tar zxf ceres-solver-2.2.0.tar.gz
+mkdir ceres-bin
+cd ceres-bin
+cmake ../ceres-solver-2.2.0
+make -j3
+make test
+# Optionally install Ceres, it can also be exported using CMake which
+# allows Ceres to be used without requiring installation, see the documentation
+# for the EXPORT_BUILD_DIR option for more information.
+sudo make install
+```
+ ## 其余：
+```bash
+sudo apt install -y \
+git \
+g++ \
+cmake \
+can-utils \
+libopencv-dev \
+libfmt-dev \
+libeigen3-dev \
+libspdlog-dev \
+libyaml-cpp-dev \
+libusb-1.0-0-dev \
+nlohmann-json3-dev \
+openssh-server \
+screen
+ ```
