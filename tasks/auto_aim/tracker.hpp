@@ -22,12 +22,15 @@ public:
   std::string state() const;
 
   std::list<Target> track(
-    std::list<Armor> & armors, std::chrono::steady_clock::time_point t,
+    std::list<Armor> & armors, std::chrono::steady_clock::time_point t, int id = 0,
     bool use_enemy_color = true);
 
   std::tuple<omniperception::DetectionResult, std::list<Target>> track(
     const std::vector<omniperception::DetectionResult> & detection_queue, std::list<Armor> & armors,
-    std::chrono::steady_clock::time_point t, bool use_enemy_color = true);
+    std::chrono::steady_clock::time_point t, int id = 0, bool use_enemy_color = true);
+
+  bool set_enemy_color(int id);
+  Color get_enemy_color() const;
 
 private:
   Solver & solver_;
@@ -42,7 +45,7 @@ private:
   Target target_;
   std::chrono::steady_clock::time_point last_timestamp_;
   ArmorPriority omni_target_priority_;
-  cv::Point2f img_center_; // 图像中心坐标
+  cv::Point2f img_center_;  // 图像中心坐标
 
   void state_machine(bool found);
 

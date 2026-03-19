@@ -19,7 +19,7 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
   omni_target_priority_{ArmorPriority::fifth}
 {
   auto yaml = YAML::LoadFile(config_path);
-  enemy_color_ = (yaml["enemy_color"].as<std::string>() == "red") ? Color::red : Color::blue;
+  enemy_color_ = (yaml["enemy_color"].as<std::string>() == "red") ? Color::red : Color::blue; 
   min_detect_count_ = yaml["min_detect_count"].as<int>();
   max_temp_lost_count_ = yaml["max_temp_lost_count"].as<int>();
   outpost_max_temp_lost_count_ = yaml["outpost_max_temp_lost_count"].as<int>();
@@ -35,11 +35,12 @@ Tracker::Tracker(const std::string & config_path, Solver & solver)
 std::string Tracker::state() const { return state_; }
 
 std::list<Target> Tracker::track(
-  std::list<Armor> & armors, std::chrono::steady_clock::time_point t, bool use_enemy_color)
+  std::list<Armor> & armors, std::chrono::steady_clock::time_point t, int id, bool use_enemy_color)
 {
   auto dt = tools::delta_time(t, last_timestamp_);
   last_timestamp_ = t;
-
+  set_enemy_color(id);
+  
   // 时间间隔过长，说明可能发生了相机离线
   if (state_ != "lost" && dt > 0.1) {
     tools::logger()->warn("[Tracker] Large dt: {:.3f}s", dt);
@@ -102,7 +103,7 @@ std::list<Target> Tracker::track(
 
 std::tuple<omniperception::DetectionResult, std::list<Target>> Tracker::track(
   const std::vector<omniperception::DetectionResult> & detection_queue, std::list<Armor> & armors,
-  std::chrono::steady_clock::time_point t, bool use_enemy_color)
+  std::chrono::steady_clock::time_point t,int id, bool use_enemy_color)
 {
   omniperception::DetectionResult switch_target{std::list<Armor>(), t, 0, 0};
   omniperception::DetectionResult temp_target{std::list<Armor>(), t, 0, 0};
@@ -296,5 +297,24 @@ bool Tracker::update_target(std::list<Armor> & armors, std::chrono::steady_clock
 
   return true;
 }
+
+bool Tracker::set_enemy_color(int id){
+  //红方:1-11 蓝方:101-111
+  if ((id < 1 || id > 11) && (id < 101 || id > 111)) {
+    tools::logger()->warn("[Tracker] Invalid ID {}. Using enemy color from config file.", id);
+    return false; // 无效的id
+  }
+  if(id>100){
+    enemy_color_ = Color::blue;
+  }
+  else{
+    enemy_color_ = Color::red;
+  }
+  return true;
+}
+
+  Color Tracker::get_enemy_color() const{
+    return enemy_color_;
+  }
 
 }  // namespace auto_aim

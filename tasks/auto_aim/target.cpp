@@ -195,7 +195,7 @@ void Target::update_ypda(const Armor & armor, int id)
     {4e-3, 4e-3, log(std::abs(delta_angle) + 1) + 1,
      log(std::abs(armor.ypd_in_world[2]) + 1) / 200 + 9e-2}};
 
-  //测量过程噪声偏差的方差
+  //测量过程噪声偏差的方差(R向量转换为对角矩阵)
   Eigen::MatrixXd R = R_dig.asDiagonal();
 
   // 定义非线性转换函数h: x -> z

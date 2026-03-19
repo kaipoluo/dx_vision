@@ -174,7 +174,8 @@ void Gimbal::read_thread()
     float temp_pitch_vel = rx_data_.pitch_vel;
     float temp_bullet_speed = rx_data_.bullet_speed;
     uint8_t temp_mode = rx_data_.mode;
-    
+    int temp_id = rx_data_.id;// 添加id字段
+        
     std::lock_guard<std::mutex> lock(mutex_);
 
     // 使用临时变量赋值
@@ -183,6 +184,7 @@ void Gimbal::read_thread()
     state_.pitch = temp_pitch;
     state_.pitch_vel = temp_pitch_vel;
     state_.bullet_speed = temp_bullet_speed;
+    state_.id = temp_id;// 添加id字段
     // 删除弹丸剩余量
 
     switch (temp_mode) {
@@ -206,7 +208,7 @@ void Gimbal::read_thread()
   
     // // 打印接收云台信息
     // tools::logger()->debug("[Gimbal] Data received successfully. Mode: {}, Yaw: {:.2f}, Pitch: {:.2f},CRC: {}",
-    //                        static_cast<int>(temp_mode), temp_yaw * 57.3, temp_pitch * 57.3, temp_crc16);
+    //                 temp_id, static_cast<int>(temp_mode), temp_yaw * 57.3, temp_pitch * 57.3, temp_crc16);
     
   }
 
