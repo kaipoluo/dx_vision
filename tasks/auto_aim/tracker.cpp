@@ -304,7 +304,7 @@ bool Tracker::set_enemy_color(int id){
     tools::logger()->warn("[Tracker] Invalid ID {}. Using enemy color from config file.", id);
     return false; // 无效的id
   }
-  if(id>100){
+  if(id<100){
     enemy_color_ = Color::blue;
   }
   else{
