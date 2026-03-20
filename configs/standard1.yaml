@@ -38,8 +38,8 @@ max_temp_lost_count: 15
 outpost_max_temp_lost_count: 75
 
 #####-----aimer参数-----#####
-yaw_offset: -2.5 # degree -2.5
-pitch_offset: 2 # degree 2
+yaw_offset: -1 # degree -2.5
+pitch_offset: -6 # degree 2
 comming_angle: 60 # degree
 leaving_angle: 20 # degree
 decision_speed: 8 # rad/s
@@ -99,10 +99,3 @@ R_yaw: [1]
 max_pitch_acc: 100
 Q_pitch: [9e6,0]
 R_pitch: [1]
-
-#####-----buff_detector参数-----#####
-model: "assets/yolo11_buff_int8.xml"
-
-#####-----buff_aimer参数-----#####
-fire_gap_time: 0.520   # s
-predict_time: 0.100     # s
