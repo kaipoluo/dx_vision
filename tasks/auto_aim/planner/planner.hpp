@@ -40,8 +40,8 @@ public:
   Plan plan(std::optional<Target> target, double bullet_speed);
 
 private:
-  double yaw_offset_;
-  double pitch_offset_;
+  // 距离相关的偏移量配置，格式：distance -> (yaw_offset, pitch_offset)
+  std::vector<std::tuple<double, double, double>> distance_offsets_;
   double fire_thresh_;
   double low_speed_delay_time_, high_speed_delay_time_, decision_speed_;
 
@@ -50,6 +50,9 @@ private:
 
   void setup_yaw_solver(const std::string & config_path);
   void setup_pitch_solver(const std::string & config_path);
+  
+  // 根据距离计算插值后的偏移量
+  std::pair<double, double> get_offset_by_distance(double distance);
 
   Eigen::Matrix<double, 2, 1> aim(const Target & target, double bullet_speed);
   Trajectory get_trajectory(Target & target, double yaw0, double bullet_speed);

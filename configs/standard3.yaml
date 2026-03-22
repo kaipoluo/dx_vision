@@ -38,25 +38,18 @@ max_temp_lost_count: 15
 outpost_max_temp_lost_count: 75
 
 #####-----aimer参数-----#####
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 yaw_offset: -0.5 # -0.5(能用) 左移调大 degree -2.5 +  left     - right -2.4   -0.75
 pitch_offset: 4.5 # 4.5（能用）上移调大 deg  （原）ree 2 正值：瞄准点向down偏移 负值：瞄准点向up偏移  -2.5
+
+# 距离相关的偏移量补偿，格式为：[[距离1, yaw偏移1, pitch偏移1], [距离2, yaw偏移2, pitch偏移2], ...]
+# 偏移量单位：度
+distance_offsets:
+  - [0.5, -1, -6]    # 0.5米距离
+  - [1, -1.5, -7]  # 1米距离
+  - [1.5, -2, -8]   # 1.5米距离
+  - [2, -2.5, -9] # 2米距离
+  - [2.5, -3, -10]  # 2.5米距离
+
 comming_angle: 60 # degree
 leaving_angle: 20 # degree
 decision_speed: 8 # rad/s
@@ -125,9 +118,3 @@ R_yaw: [100]
 max_pitch_acc: 50
 Q_pitch: [9e6,100] #响应精度
 R_pitch: [200] #平滑精度
-
-
-
-#####-----buff_aimer参数-----#####
-fire_gap_time: 0.520   # s
-predict_time: 0.100     # s

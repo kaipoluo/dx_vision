@@ -13,8 +13,20 @@ namespace auto_aim
 Planner::Planner(const std::string & config_path)
 {
   auto yaml = tools::load(config_path);
-  yaw_offset_ = tools::read<double>(yaml, "yaw_offset") / 57.3;
-  pitch_offset_ = tools::read<double>(yaml, "pitch_offset") / 57.3;
+  
+  // 读取距离相关的偏移量配置
+  auto offset_list = tools::read<std::vector<std::vector<double>>>(yaml, "distance_offsets");
+  for (const auto & offset : offset_list) {
+    if (offset.size() == 3) {
+      // 转换pitch偏移量为弧度
+      distance_offsets_.emplace_back(offset[0], offset[1] / 57.3, offset[2] / 57.3);
+    }
+  }
+  
+  // // 确保偏移量按距离升序排序
+  // std::sort(distance_offsets_.begin(), distance_offsets_.end(), 
+  //           [](const auto & a, const auto & b) { return std::get<0>(a) < std::get<0>(b); });
+
   fire_thresh_ = tools::read<double>(yaml, "fire_thresh");
   decision_speed_ = tools::read<double>(yaml, "decision_speed");
   high_speed_delay_time_ = tools::read<double>(yaml, "high_speed_delay_time");
@@ -167,13 +179,17 @@ Eigen::Matrix<double, 2, 1> Planner::aim(const Target & target, double bullet_sp
       yaw = xyza[3];
     }
   }
+  
+  // 获取当前距离对应的偏移量
+  auto [yaw_offset, pitch_offset] = get_offset_by_distance(min_dist);
+  
   debug_xyza = Eigen::Vector4d(xyz.x(), xyz.y(), xyz.z(), yaw);
 
   auto azim = std::atan2(xyz.y(), xyz.x());
   auto bullet_traj = tools::Trajectory(bullet_speed, min_dist, xyz.z());
   if (bullet_traj.unsolvable) throw std::runtime_error("Unsolvable bullet trajectory!");
 
-  return {tools::limit_rad(azim + yaw_offset_), -bullet_traj.pitch - pitch_offset_};
+  return {tools::limit_rad(azim + yaw_offset), -bullet_traj.pitch - pitch_offset};
 }
 
 Trajectory Planner::get_trajectory(Target & target, double yaw0, double bullet_speed)
@@ -200,6 +216,43 @@ Trajectory Planner::get_trajectory(Target & target, double yaw0, double bullet_s
   }
 
   return traj;
+}
+
+std::pair<double, double> Planner::get_offset_by_distance(double distance)
+{
+  if (distance_offsets_.empty()) {
+    return {0.0, 0.0}; // 默认无偏移
+  }
+  
+  // 如果距离小于最小配置距离，返回最小距离的偏移量
+  if (distance <= std::get<0>(distance_offsets_.front())) {
+    return {std::get<1>(distance_offsets_.front()), std::get<2>(distance_offsets_.front())};
+  }
+  
+  // 如果距离大于最大配置距离，返回最大距离的偏移量
+  if (distance >= std::get<0>(distance_offsets_.back())) {
+    return {std::get<1>(distance_offsets_.back()), std::get<2>(distance_offsets_.back())};
+  }
+  
+  // 在配置的距离区间内进行线性插值
+  for (size_t i = 0; i < distance_offsets_.size() - 1; ++i) {
+    double dist1 = std::get<0>(distance_offsets_[i]);
+    double yaw1 = std::get<1>(distance_offsets_[i]);
+    double pitch1 = std::get<2>(distance_offsets_[i]);
+    
+    double dist2 = std::get<0>(distance_offsets_[i + 1]);
+    double yaw2 = std::get<1>(distance_offsets_[i + 1]);
+    double pitch2 = std::get<2>(distance_offsets_[i + 1]);
+    
+    if (distance >= dist1 && distance <= dist2) {
+      double ratio = (distance - dist1) / (dist2 - dist1);
+      double yaw_offset = yaw1 + ratio * (yaw2 - yaw1);
+      double pitch_offset = pitch1 + ratio * (pitch2 - pitch1);
+      return {yaw_offset, pitch_offset};
+    }
+  }
+  
+  return {0.0, 0.0}; // 兜底返回
 }
 
 }  // namespace auto_aim

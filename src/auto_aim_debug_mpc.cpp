@@ -98,6 +98,12 @@ int main(int argc, char * argv[])
         data["w"] = 0.0;
       }
 
+      float diff_yaw = (plan.yaw - gs.yaw)*57.2958;
+      float diff_pitch = (plan.pitch - gs.pitch)*57.2958;
+      data["diff_yaw"] = diff_yaw;
+      data["diff_pitch"] = diff_pitch;
+      data["distance"] = target.has_value() ? std::hypot(target->ekf_x()[0], target->ekf_x()[2]) : 0.0;
+      
       plotter.plot(data);
 
       std::this_thread::sleep_for(10ms);
