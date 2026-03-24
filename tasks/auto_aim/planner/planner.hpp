@@ -39,9 +39,14 @@ public:
   Plan plan(Target target, double bullet_speed);
   Plan plan(std::optional<Target> target, double bullet_speed);
 
+// 在Planner类的private部分添加基础偏移量成员变量
 private:
   // 距离相关的偏移量配置，格式：distance -> (yaw_offset, pitch_offset)
   std::vector<std::tuple<double, double, double>> distance_offsets_;
+  // 基础偏移量配置（当没有距离相关配置时使用）
+  double yaw_offset_;
+  double pitch_offset_;
+  
   double fire_thresh_;
   double low_speed_delay_time_, high_speed_delay_time_, decision_speed_;
 

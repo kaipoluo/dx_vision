@@ -10,9 +10,14 @@ using namespace std::chrono_literals;
 
 namespace auto_aim
 {
+// 在构造函数中添加基础偏移量的读取
 Planner::Planner(const std::string & config_path)
 {
   auto yaml = tools::load(config_path);
+  
+  // 读取基础偏移量配置，并转换为弧度
+  yaw_offset_ = tools::read<double>(yaml, "yaw_offset") / 57.3;
+  pitch_offset_ = tools::read<double>(yaml, "pitch_offset") / 57.3;
   
   // 读取距离相关的偏移量配置
   auto offset_list = tools::read<std::vector<std::vector<double>>>(yaml, "distance_offsets");
@@ -23,10 +28,7 @@ Planner::Planner(const std::string & config_path)
     }
   }
   
-  // // 确保偏移量按距离升序排序
-  // std::sort(distance_offsets_.begin(), distance_offsets_.end(), 
-  //           [](const auto & a, const auto & b) { return std::get<0>(a) < std::get<0>(b); });
-
+  // 其他构造函数代码保持不变
   fire_thresh_ = tools::read<double>(yaml, "fire_thresh");
   decision_speed_ = tools::read<double>(yaml, "decision_speed");
   high_speed_delay_time_ = tools::read<double>(yaml, "high_speed_delay_time");
@@ -221,7 +223,8 @@ Trajectory Planner::get_trajectory(Target & target, double yaw0, double bullet_s
 std::pair<double, double> Planner::get_offset_by_distance(double distance)
 {
   if (distance_offsets_.empty()) {
-    return {0.0, 0.0}; // 默认无偏移
+    // 如果没有距离相关的偏移量配置，使用配置文件中的基础偏移量
+    return {yaw_offset_, pitch_offset_};
   }
   
   // 如果距离小于最小配置距离，返回最小距离的偏移量
