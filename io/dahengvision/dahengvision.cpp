@@ -10,7 +10,7 @@ namespace io
 DahengVision::DahengVision(double exposure_ms, double gamma, const std::string & vid_pid)
 : exposure_ms_(exposure_ms),
   gamma_(gamma),
-  queue_(1),  // 队列大小设为1，确保单帧处理
+  queue_(5),  // 增加队列大小，提高缓冲能力
   handle_(nullptr),
   height_(0),
   width_(0),
@@ -182,11 +182,14 @@ void DahengVision::open()
     width_ = static_cast<int64_t>(width_val.nCurValue);
     height_ = static_cast<int64_t>(height_val.nCurValue);
 
-    // 6. 流层配置（减少残帧）
+    // 6. 流层配置（减少残帧，优化帧率）
     GX_DS_HANDLE data_stream;
     if (GXGetDataStreamHandleFromDev(handle_, 1, &data_stream) == GX_STATUS_SUCCESS) {
-      GXSetIntValue(data_stream, "BlockTimeout", 500);   // 数据块超时500ms
-      GXSetIntValue(data_stream, "ResendTimeout", 200);  // 重传超时200ms
+      GXSetIntValue(data_stream, "BlockTimeout", 200);   // 减少数据块超时到200ms
+      GXSetIntValue(data_stream, "ResendTimeout", 100);  // 减少重传超时到100ms
+      // 增加缓冲区数量以提高帧率
+      GXSetIntValue(data_stream, "BufferHandlingMode", 1);  // 启用循环缓冲区模式
+      GXSetIntValue(data_stream, "BufferCount", 8);  // 设置缓冲区数量为8
     }
 
     // 7. 启动流传输（Linux专用）
@@ -200,15 +203,15 @@ void DahengVision::open()
       GX_FRAME_BUFFER * frame_buffer = nullptr;
       while (ok_ && !quit_) {
         // 获取图像缓冲区
-        GX_STATUS status = GXDQBuf(handle_, &frame_buffer, 100);
+        GX_STATUS status = GXDQBuf(handle_, &frame_buffer, 50);  // 减少超时时间到50ms
         if (status == GX_STATUS_SUCCESS && frame_buffer != nullptr) {
           if (frame_buffer->nStatus == GX_FRAME_STATUS_SUCCESS) {
             // BayerBG8转RGB，但直接转换为BGR以解决红蓝颠倒问题
             cv::Mat bayer_img(height_, width_, CV_8UC1, frame_buffer->pImgBuf);
             // 水平+垂直翻转
-            cv::flip(bayer_img, bayer_img, -1);  // 水平+垂直翻转
+            //cv::flip(bayer_img, bayer_img, -1);  // 水平+垂直翻转
             cv::Mat rgb_img;
-            cv::cvtColor(bayer_img, rgb_img, cv::COLOR_BayerRG2BGR);
+            cv::cvtColor(bayer_img, rgb_img, cv::COLOR_BayerBG2BGR);
 
             // 存入线程安全队列
             CameraData data;
@@ -225,7 +228,8 @@ void DahengVision::open()
           break;
         }
 
-        std::this_thread::sleep_for(std::chrono::microseconds(100));
+        // 移除等待时间，提高帧率
+        // std::this_thread::sleep_for(std::chrono::microseconds(100));
       }
     });
 

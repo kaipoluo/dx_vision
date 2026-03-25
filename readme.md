@@ -13,6 +13,10 @@
 ### 1V1:
 
      ./build/auto_aim_debug_mpc ./configs/standard1.yaml
+### Hero:
+    ./build/auto_aim_debug_mpc ./configs/hero.yaml
+
+
 ### 多线程模式:(弃用)
     ./build/mt_auto_aim_debug ./configs/standard1.yaml
 ## 标准模式:
@@ -27,8 +31,11 @@
     -d: 显示视频流\
     -h 或 --help: 显示帮助信息
 ### 相机自瞄测试
-    ./build/camera_auto_aim_test configs camera_auto_aim.yaml
+    ./build/camera_auto_aim_test configs/camera_auto_aim.yaml
     ./build/camera_auto_aim_test configs/standard1.yaml 
+
+##### 帧数显示
+    ./build/camera_detect_test configs/camera_auto_aim.yaml
 ## 串口gimbal测试
 ### 串口收发测试
     ./build/gimbal_test configs/standard4.yaml

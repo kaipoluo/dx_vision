@@ -1,4 +1,4 @@
-# enemy_color: "blue"
+enemy_color: "blue"
 # enemy_color: "red"
 
 #####-----神经网络参数-----#####
@@ -43,12 +43,12 @@ pitch_offset: -6 # degree 2
 
 # 距离相关的偏移量补偿，格式为：[[距离1, yaw偏移1, pitch偏移1], [距离2, yaw偏移2, pitch偏移2], ...]
 # 偏移量单位：度(若注释掉，则不使用距离补偿，直接使用aimer原偏移量)
-# distance_offsets:
-#   - [0.5, -1, -6]    # 0.5米距离
-#   - [1, -1.5, -7]  # 1米距离
-#   - [1.5, -2, -8]   # 1.5米距离
-#   - [2, -2.5, -9] # 2米距离
-#   - [2.5, -3, -10]  # 2.5米距离
+distance_offsets:
+  - [0.5, -1, -6]    # 0.5米距离
+  - [1, -1.5, -7]  # 1米距离
+  - [1.5, -2, -8]   # 1.5米距离
+  - [2, -2.5, -9] # 2米距离
+  - [2.5, -3, -10]  # 2.5米距离
 
 # 小陀螺补偿参数
 xtl_yaw_compensation: 0.05   # yaw补偿量
@@ -73,7 +73,7 @@ auto_fire: true # 是否由自瞄控制射击
 
 camera_name: "dahengvision"
 exposure_ms: 10  # 曝光时间(毫秒)
-gamma: 0.5      # 伽马值
+gamma: 15      # 伽马值
 vid_pid: "2ba2:4d55"  # 大恒相机的VID:PID
 
 #  1  0  0
