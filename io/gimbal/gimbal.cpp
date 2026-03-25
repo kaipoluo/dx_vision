@@ -12,6 +12,22 @@ Gimbal::Gimbal(const std::string & config_path)
   auto yaml = tools::load(config_path);
   auto com_port = tools::read<std::string>(yaml, "com_port");
   auto baud_rate = tools::read<int>(yaml, "baud_rate");
+  
+  // 读取小陀螺补偿参数，如果不存在则使用0
+  try {
+    xtl_yaw_compensation_ = tools::read<float>(yaml, "xtl_yaw_compensation");
+  } catch (...) {
+    xtl_yaw_compensation_ = 0.00f;  // 默认yaw补偿量
+    tools::logger()->info("[Gimbal] Using default xtl_yaw_compensation: {:.3f} °", xtl_yaw_compensation_ * 57.3f);
+  }
+  
+  try {
+    xtl_pitch_compensation_ = tools::read<float>(yaml, "xtl_pitch_compensation");
+  } catch (...) {
+    xtl_pitch_compensation_ = 0.00f;  // 默认pitch补偿量
+    tools::logger()->info("[Gimbal] Using default xtl_pitch_compensation: {:.3f} °", xtl_pitch_compensation_ * 57.3f);
+  }
+  
   try {
     serial_.setPort(com_port);
     serial_.setBaudrate(baud_rate); 
@@ -25,7 +41,8 @@ Gimbal::Gimbal(const std::string & config_path)
 
   thread_ = std::thread(&Gimbal::read_thread, this);
 
-  tools::logger()->info("[Gimbal] Initialized successfully.");
+  tools::logger()->info("[Gimbal] Initialized successfully. XTL compensation: yaw={:.3f}°, pitch={:.3f}°", 
+                        xtl_yaw_compensation_ * 57.3f, xtl_pitch_compensation_ * 57.3f);
 }
 
 Gimbal::~Gimbal()
@@ -97,11 +114,35 @@ void Gimbal::send(
   bool control, bool fire, float yaw, float yaw_vel, float yaw_acc, float pitch, float pitch_vel,
   float pitch_acc, bool is_empty)
 {
+  // 获取当前小陀螺状态
+  bool xtl_enabled = false;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    xtl_enabled = state_.xtl;
+  }
+  
+  // 如果小陀螺开启，对yaw和pitch进行补偿
+  float compensated_yaw = yaw;
+  float compensated_pitch = pitch;
+  
+  if (xtl_enabled) {
+    // 根据当前角速度方向决定补偿方向
+    float yaw_vel_sign = (state_.yaw_vel >= 0) ? 1.0f : -1.0f;
+    float pitch_vel_sign = (state_.pitch_vel >= 0) ? 1.0f : -1.0f;
+    
+    compensated_yaw = yaw + yaw_vel_sign * xtl_yaw_compensation_;
+    compensated_pitch = pitch + pitch_vel_sign * xtl_pitch_compensation_;
+    
+    tools::logger()->debug("[Gimbal] XTL compensation applied: yaw={:.3f}°->{:.3f}°, pitch={:.3f}°->{:.3f}°", 
+                           yaw * 57.3f, compensated_yaw * 57.3f, 
+                           pitch * 57.3f, compensated_pitch * 57.3f);
+  }
+  
   tx_data_.mode = control ? (fire ? 2 : 1) : 0;
-  tx_data_.yaw = yaw;
+  tx_data_.yaw = compensated_yaw;
   tx_data_.yaw_vel = yaw_vel;
   tx_data_.yaw_acc = yaw_acc;
-  tx_data_.pitch = pitch;
+  tx_data_.pitch = compensated_pitch;
   tx_data_.pitch_vel = pitch_vel;
   tx_data_.pitch_acc = pitch_acc;
   tx_data_.is_empty = is_empty;
@@ -174,7 +215,8 @@ void Gimbal::read_thread()
     float temp_pitch_vel = rx_data_.pitch_vel;
     float temp_bullet_speed = rx_data_.bullet_speed;
     uint8_t temp_mode = rx_data_.mode;
-    int temp_id = rx_data_.id;// 添加id字段
+    int temp_id = rx_data_.id;
+    bool temp_xtl = rx_data_.xtl; // 读取小陀螺标志
         
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -184,8 +226,8 @@ void Gimbal::read_thread()
     state_.pitch = temp_pitch;
     state_.pitch_vel = temp_pitch_vel;
     state_.bullet_speed = temp_bullet_speed;
-    state_.id = temp_id;// 添加id字段
-    // 删除弹丸剩余量
+    state_.id = temp_id;
+    state_.xtl = temp_xtl; // 设置小陀螺标志
 
     switch (temp_mode) {
       case 0:

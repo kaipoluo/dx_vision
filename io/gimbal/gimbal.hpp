@@ -18,13 +18,14 @@ namespace io
 struct __attribute__((packed)) GimbalToVision
 {
   uint8_t head[2] = {'S', 'P'};
-  uint8_t mode;  // 0: 空闲, 1: 自瞄, 2: 小符, 3: 大符
+  uint8_t mode;  // 0: 空闲, 1: 自瞄
   float yaw;
   float yaw_vel;
   float pitch;
   float pitch_vel;
   float bullet_speed;  // 子弹速度
   int id;
+  bool xtl; // 是否打开小陀螺
   uint16_t crc16;
 };
 
@@ -63,6 +64,7 @@ struct GimbalState
   float pitch_vel;
   float bullet_speed;
   int id;
+  bool xtl; // 是否打开小陀螺
 };
 
 class Gimbal
@@ -99,6 +101,11 @@ private:
     queue_{1000};
   std::tuple<Eigen::Quaterniond, std::chrono::steady_clock::time_point> data_ahead_;
   std::tuple<Eigen::Quaterniond, std::chrono::steady_clock::time_point> data_behind_;
+  
+  // 小陀螺补偿参数
+  float xtl_yaw_compensation_;
+  float xtl_pitch_compensation_;
+  
   bool read(uint8_t * buffer, size_t size);
   void read_thread();
   void reconnect();
