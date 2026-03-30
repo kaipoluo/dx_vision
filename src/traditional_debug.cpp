@@ -38,7 +38,7 @@ int main(int argc, char * argv[])
 
   tools::Exiter exiter;
   tools::Recorder recorder;
-
+  tools::Plotter plotter;
   io::Gimbal gimbal(config_path);
   io::Camera camera(config_path);
 
@@ -72,17 +72,6 @@ int main(int argc, char * argv[])
           plan.pitch_acc, is_empty);
         nlohmann::json data;
         
-        // 计算帧率
-        frame_count++;
-        auto current_time = std::chrono::steady_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_fps_time).count();
-        double fps = 0.0;
-        if (elapsed >= 1000) {
-          fps = frame_count * 1000.0 / elapsed;
-          frame_count = 0;
-          last_fps_time = current_time;
-        }
-        
         data["t"] = tools::delta_time(std::chrono::steady_clock::now(), t0);
         data["control"] = plan.control;
         data["fire"] = plan.fire;
@@ -92,8 +81,9 @@ int main(int argc, char * argv[])
         data["gimbal_pitch"] = gs.pitch * 57.3;
         data["is_empty"] = is_empty;
         data["bullet_speed"] = gs.bullet_speed;
-        data["fps"] = fps;  // 在data中添加帧率信息
-        
+        data["robot_id"] = gs.id;
+
+        plotter.plot(data);
         std::this_thread::sleep_for(10ms);
       } else
         std::this_thread::sleep_for(200ms);
@@ -121,17 +111,6 @@ int main(int argc, char * argv[])
     if (mode.load() == io::GimbalMode::AUTO_AIM) {
       auto armors = detector.detect(img);  // 使用传统检测方法
       
-      // 绘制装甲板
-      for (const auto &armor : armors) {
-        if (armor.points.size() != 4) continue;
-        // 绘制装甲板边界框
-        for (int i = 0; i < 4; i++) {
-          cv::line(img, 
-                   cv::Point(armor.points[i].x, armor.points[i].y), 
-                   cv::Point(armor.points[(i+1)%4].x, armor.points[(i+1)%4].y), 
-                   {0, 255, 0}, 2);
-        }
-      }
       
       auto targets = tracker.track(armors, t, gimbal.state().id);
       if (!targets.empty())
@@ -143,9 +122,7 @@ int main(int argc, char * argv[])
     else
       gimbal.send(false, false, 0, 0, 0, 0, 0, 0);
     
-    // 显示检测窗口
-    cv::resize(img, img, {}, 0.5, 0.5);  // 缩小图片尺寸以便显示
-    cv::imshow("Detection", img);
+    
     auto key = cv::waitKey(1);
     if (key == 'q') break;
   }
