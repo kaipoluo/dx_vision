@@ -15,6 +15,10 @@
      ./build/auto_aim_debug_mpc ./configs/standard1.yaml
 ### Hero:
     ./build/auto_aim_debug_mpc ./configs/hero.yaml
+    
+### 传统模式:
+    ./build/traditional_debug ./configs/hero.yaml
+
 
 
 ### 多线程模式:(弃用)
