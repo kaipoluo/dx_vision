@@ -32,8 +32,10 @@ private:
   std::string device_;
   YOLO yolo_;
 
+  // 修改队列配置，当队列满时弹出旧帧
   tools::ThreadSafeQueue<
-    std::tuple<cv::Mat, std::chrono::steady_clock::time_point, ov::InferRequest>>
+    std::tuple<cv::Mat, std::chrono::steady_clock::time_point, ov::InferRequest>,
+    true>  // 设置PopWhenFull为true
     queue_{16, [] { tools::logger()->debug("[MultiThreadDetector] queue is full!"); }};
 };
 
