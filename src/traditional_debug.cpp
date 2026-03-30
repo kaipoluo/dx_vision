@@ -42,7 +42,7 @@ int main(int argc, char * argv[])
   io::Gimbal gimbal(config_path);
   io::Camera camera(config_path);
 
-  auto_aim::Detector detector(config_path, true);  // 使用传统检测器替代YOLO
+  auto_aim::Detector detector(config_path, true);  // 使用传统检测器
   auto_aim::Solver solver(config_path);
   auto_aim::Tracker tracker(config_path, solver);
   auto_aim::Planner planner(config_path);
@@ -109,7 +109,12 @@ int main(int argc, char * argv[])
 
     /// 自瞄
     if (mode.load() == io::GimbalMode::AUTO_AIM) {
-      auto armors = detector.detect(img);  // 使用传统检测方法
+      auto armors = detector.detect(img);
+      tools::logger()->info("Detected {} armors", armors.size());
+      for (const auto& armor : armors) {
+        tools::logger()->info(" center: ({}, {})", 
+                          armor.center.x, armor.center.y);
+      }
       
       
       auto targets = tracker.track(armors, t, gimbal.state().id);
