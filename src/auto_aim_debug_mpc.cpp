@@ -12,6 +12,7 @@
 #include "tasks/auto_aim/solver.hpp"
 #include "tasks/auto_aim/tracker.hpp"
 #include "tasks/auto_aim/yolo.hpp"
+#include "tasks/auto_aim/multithread/mt_detector.hpp"  // 添加多线程检测器头文件
 #include "tools/exiter.hpp"
 #include "tools/img_tools.hpp"
 #include "tools/logger.hpp"
@@ -40,7 +41,8 @@ int main(int argc, char * argv[])
   io::Gimbal gimbal(config_path);
   io::Camera camera(config_path);
 
-  auto_aim::YOLO yolo(config_path, true);
+  // 使用多线程YOLO检测器替代单线程YOLO
+  auto_aim::multithread::MultiThreadDetector mt_detector(config_path, true);
   auto_aim::Solver solver(config_path);
   auto_aim::Tracker tracker(config_path, solver);
   auto_aim::Planner planner(config_path);
@@ -49,6 +51,12 @@ int main(int argc, char * argv[])
   target_queue.push(std::nullopt);
 
   std::atomic<bool> quit = false;
+  
+  // 帧率统计变量
+  auto last_fps_time = std::chrono::steady_clock::now();
+  int frame_count = 0;
+  double fps = 0.0;
+
   auto plan_thread = std::thread([&]() {
     auto t0 = std::chrono::steady_clock::now();
 
@@ -87,6 +95,10 @@ int main(int argc, char * argv[])
       data["bullet_speed"] = gs.bullet_speed;
       data["robot_id"] = gs.id;
       data["mode"] = plan.control ? (plan.fire ? 2 : 1) : 0;
+      
+      // 添加帧率数据
+      data["fps"] = fps;
+
       if (target.has_value()) {
         data["target_z"] = target->ekf_x()[4];   //z目标在世界坐标系中的z轴位置坐标
         data["target_vz"] = target->ekf_x()[5];  //vz目标在z轴方向的速度分量
@@ -112,8 +124,12 @@ int main(int argc, char * argv[])
     auto q = gimbal.q(t);
 
     solver.set_R_gimbal2world(q);
-    auto armors = yolo.detect(img);
-    auto targets = tracker.track(armors, t,gimbal.state().id);
+    
+    // 使用多线程检测器进行检测
+    mt_detector.push(img, t);
+    auto [armors, detection_time] = mt_detector.pop();
+    
+    auto targets = tracker.track(armors, t, gimbal.state().id);
     if (!targets.empty())
       target_queue.push(targets.front());
     else
@@ -135,6 +151,21 @@ int main(int argc, char * argv[])
         solver.reproject_armor(aim_xyza.head(3), aim_xyza[3], target.armor_type, target.name);
       tools::draw_points(img, image_points, {0, 0, 255});
     }
+
+    // 计算并显示帧率
+    frame_count++;
+    auto current_time = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(current_time - last_fps_time).count();
+    
+    if (elapsed >= 1000) {
+      fps = frame_count * 1000.0 / elapsed;
+      frame_count = 0;
+      last_fps_time = current_time;
+    }
+    
+    // 在图像上显示帧率
+    std::string fps_text = fmt::format("FPS: {:.1f}", fps);
+    cv::putText(img, fps_text, cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 1.0, cv::Scalar(0, 255, 0), 2);
 
     cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
     cv::imshow("reprojection", img);
