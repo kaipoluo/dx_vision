@@ -46,7 +46,7 @@ int main(int argc, char * argv[])
   auto_aim::multithread::MultiThreadDetector detector(config_path, true);
   auto_aim::Solver solver(config_path);
   auto_aim::Tracker tracker(config_path, solver);
-  auto_aim::Planner planner(config_path);
+  auto_aim::Aimer aimer(config_path);  // 使用Aimer
 
   tools::ThreadSafeQueue<std::optional<auto_aim::Target>, true> target_queue(1);
   target_queue.push(std::nullopt);
@@ -80,20 +80,30 @@ int main(int argc, char * argv[])
       if (!target_queue.empty() && mode == io::GimbalMode::AUTO_AIM) {
         auto target = target_queue.front();
         auto gs = gimbal.state();
-        auto plan = planner.plan(target, gs.bullet_speed);
-        auto is_empty = target.has_value() ? false : true;
+        
+        // 使用Aimer替代Planner进行直接角度控制
+        io::Command command;
+        if (target.has_value()) {
+          std::list<auto_aim::Target> targets = {target.value()};
+          command = aimer.aim(targets, std::chrono::steady_clock::now(), gs.bullet_speed);
+        } else {
+          command = {false, false, 0, 0};
+        }
+        
+        auto is_empty = !target.has_value();
 
+        // 发送简单的控制命令，不使用MPC的复杂控制量
         gimbal.send(
-          plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
-          plan.pitch_acc, is_empty);
+          command.control, command.shoot, command.yaw, 0, 0, command.pitch, 0, 0, is_empty);
+        
         nlohmann::json data;
         
         data["t"] = tools::delta_time(std::chrono::steady_clock::now(), t0);
-        data["control"] = plan.control;
-        data["fire"] = plan.fire;
-        data["plan_yaw"] = plan.yaw * 57.3;
+        data["control"] = command.control;
+        data["shoot"] = command.shoot;
+        data["plan_yaw"] = command.yaw * 57.3;
         data["gimbal_yaw"] = gs.yaw * 57.3;
-        data["plan_pitch"] = plan.pitch * 57.3;
+        data["plan_pitch"] = command.pitch * 57.3;
         data["gimbal_pitch"] = gs.pitch * 57.3;
         data["is_empty"] = is_empty;
         data["bullet_speed"] = gs.bullet_speed;
