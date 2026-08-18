@@ -2,6 +2,8 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include "tools/logger.hpp"
+
 namespace auto_aim
 {
 namespace multithread
@@ -12,73 +14,72 @@ MultiThreadDetector::MultiThreadDetector(const std::string & config_path, bool d
 {
   auto yaml = YAML::LoadFile(config_path);
   auto yolo_name = yaml["yolo_name"].as<std::string>();
-  auto model_path = yaml[yolo_name + "_model_path"].as<std::string>();
-  device_ = yaml["device"].as<std::string>();
+  auto onnx_path = yaml[yolo_name + "_onnx_path"].as<std::string>();
+  auto engine_path = yaml[yolo_name + "_engine_path"].as<std::string>();
+  bool fp16 = yaml["fp16"] ? yaml["fp16"].as<bool>() : true;
 
-  auto model = core_.read_model(model_path);
-  ov::preprocess::PrePostProcessor ppp(model);
-  auto & input = ppp.input();
+  // 构建或加载 TensorRT engine
+  engine_ = std::make_unique<TrtEngine>(onnx_path, engine_path, fp16);
+  output_numel_ = engine_->outputSize() / sizeof(float);
 
-  input.tensor()
-    .set_element_type(ov::element::u8)
-    .set_shape({1, 640, 640, 3})  // TODO
-    .set_layout("NHWC")
-    .set_color_format(ov::preprocess::ColorFormat::BGR);
+  // 预分配 CPU 预处理 buffer
+  padded_input_ = cv::Mat(input_size_, input_size_, CV_8UC3, cv::Scalar(0, 0, 0));
+  float_input_.resize(input_size_ * input_size_ * 3);
 
-  input.model().set_layout("NCHW");
-
-  input.preprocess()
-    .convert_element_type(ov::element::f32)
-    .convert_color(ov::preprocess::ColorFormat::RGB)
-    // .resize(ov::preprocess::ResizeAlgorithm::RESIZE_LINEAR)
-    .scale(255.0);
-
-  model = ppp.build();
-  compiled_model_ = core_.compile_model(
-    model, device_, 
-    // 调整性能模式，优先保证低延迟和稳定帧率
-    ov::hint::performance_mode(ov::hint::PerformanceMode::LATENCY),
-    // 启用CPU优化
-    ov::hint::enable_cpu_pinning(true));
-
-  tools::logger()->info("[MultiThreadDetector] initialized !");
+  tools::logger()->info("[MultiThreadDetector] TensorRT initialized — {}x{}",
+    input_size_, input_size_);
 }
 
 void MultiThreadDetector::push(cv::Mat img, std::chrono::steady_clock::time_point t)
 {
-  auto x_scale = static_cast<double>(640) / img.rows;
-  auto y_scale = static_cast<double>(640) / img.cols;
+  // 只存原始图像 + 时间戳，CPU 预处理和 GPU 推理在 pop() 中同步完成
+  queue_.push({img.clone(), t});
+}
+
+std::tuple<std::list<Armor>, std::chrono::steady_clock::time_point>
+MultiThreadDetector::pop()
+{
+  auto [img, t] = queue_.pop();
+
+  auto x_scale = static_cast<double>(input_size_) / img.rows;
+  auto y_scale = static_cast<double>(input_size_) / img.cols;
   auto scale = std::min(x_scale, y_scale);
   auto h = static_cast<int>(img.rows * scale);
   auto w = static_cast<int>(img.cols * scale);
 
-  // preproces
-  auto input = cv::Mat(640, 640, CV_8UC3, cv::Scalar(0, 0, 0));
+  // CPU 预处理：resize + letterbox + BGR→RGB + f32 normalize
+  padded_input_.setTo(cv::Scalar(0, 0, 0));
   auto roi = cv::Rect(0, 0, w, h);
-  cv::resize(img, input(roi), {w, h});
+  cv::resize(img, padded_input_(roi), {w, h});
 
-  auto input_port = compiled_model_.input();
-  auto infer_request = compiled_model_.create_infer_request();
-  ov::Tensor input_tensor(ov::element::u8, {1, 640, 640, 3}, input.data);
+  cv::Mat rgb;
+  cv::cvtColor(padded_input_, rgb, cv::COLOR_BGR2RGB);
+  rgb.convertTo(rgb, CV_32FC3, 1.0 / 255.0);
 
-  infer_request.set_input_tensor(input_tensor);
-  infer_request.start_async();
-  queue_.push({img.clone(), t, std::move(infer_request)});
-}
+  // HWC → CHW
+  float * dst = float_input_.data();
+  for (int c = 0; c < 3; ++c) {
+    for (int row = 0; row < input_size_; ++row) {
+      auto * src_row = rgb.ptr<float>(row);
+      for (int col = 0; col < input_size_; ++col) {
+        dst[c * input_size_ * input_size_ + row * input_size_ + col] =
+          src_row[col * 3 + c];
+      }
+    }
+  }
 
-std::tuple<std::list<Armor>, std::chrono::steady_clock::time_point> MultiThreadDetector::pop()
-{
-  auto [img, t, infer_request] = queue_.pop();
-  infer_request.wait();
+  // TensorRT 推理（同步）
+  std::vector<float> float_output(output_numel_);
+  bool ok = engine_->infer(float_input_.data(), float_output.data());
+  if (!ok) {
+    tools::logger()->error("[MultiThreadDetector] inference failed");
+    return {std::list<Armor>(), t};
+  }
 
-  // postprocess
-  auto output_tensor = infer_request.get_output_tensor();
-  auto output_shape = output_tensor.get_shape();
-  cv::Mat output(output_shape[1], output_shape[2], CV_32F, output_tensor.data());
-  auto x_scale = static_cast<double>(640) / img.rows;
-  auto y_scale = static_cast<double>(640) / img.cols;
-  auto scale = std::min(x_scale, y_scale);
-  auto armors = yolo_.postprocess(scale, output, img, 0);  //暂不支持ROI
+  // 输出 → cv::Mat → postprocess（复用 yolo_ 的 parse 逻辑）
+  cv::Mat output(1, output_numel_, CV_32F, float_output.data());
+
+  auto armors = yolo_.postprocess(scale, output, img, 0);
 
   return {std::move(armors), t};
 }
@@ -86,17 +87,44 @@ std::tuple<std::list<Armor>, std::chrono::steady_clock::time_point> MultiThreadD
 std::tuple<cv::Mat, std::list<Armor>, std::chrono::steady_clock::time_point>
 MultiThreadDetector::debug_pop()
 {
-  auto [img, t, infer_request] = queue_.pop();
-  infer_request.wait();
+  auto [img, t] = queue_.pop();
 
-  // postprocess
-  auto output_tensor = infer_request.get_output_tensor();
-  auto output_shape = output_tensor.get_shape();
-  cv::Mat output(output_shape[1], output_shape[2], CV_32F, output_tensor.data());
-  auto x_scale = static_cast<double>(640) / img.rows;
-  auto y_scale = static_cast<double>(640) / img.cols;
+  auto x_scale = static_cast<double>(input_size_) / img.rows;
+  auto y_scale = static_cast<double>(input_size_) / img.cols;
   auto scale = std::min(x_scale, y_scale);
-  auto armors = yolo_.postprocess(scale, output, img, 0);  //暂不支持ROI
+  auto h = static_cast<int>(img.rows * scale);
+  auto w = static_cast<int>(img.cols * scale);
+
+  // CPU 预处理
+  padded_input_.setTo(cv::Scalar(0, 0, 0));
+  auto roi = cv::Rect(0, 0, w, h);
+  cv::resize(img, padded_input_(roi), {w, h});
+
+  cv::Mat rgb;
+  cv::cvtColor(padded_input_, rgb, cv::COLOR_BGR2RGB);
+  rgb.convertTo(rgb, CV_32FC3, 1.0 / 255.0);
+
+  float * dst = float_input_.data();
+  for (int c = 0; c < 3; ++c) {
+    for (int row = 0; row < input_size_; ++row) {
+      auto * src_row = rgb.ptr<float>(row);
+      for (int col = 0; col < input_size_; ++col) {
+        dst[c * input_size_ * input_size_ + row * input_size_ + col] =
+          src_row[col * 3 + c];
+      }
+    }
+  }
+
+  // TensorRT 推理
+  std::vector<float> float_output(output_numel_);
+  bool ok = engine_->infer(float_input_.data(), float_output.data());
+  if (!ok) {
+    tools::logger()->error("[MultiThreadDetector] inference failed");
+    return {img, std::list<Armor>(), t};
+  }
+
+  cv::Mat output(1, output_numel_, CV_32F, float_output.data());
+  auto armors = yolo_.postprocess(scale, output, img, 0);
 
   return {img, std::move(armors), t};
 }

@@ -1,60 +1,64 @@
-#ifndef AUTO_AIM__YOLOV5_HPP
-#define AUTO_AIM__YOLOV5_HPP
+#ifndef AUTO_AIM__YOLOS__YOLOV5_HPP
+#define AUTO_AIM__YOLOS__YOLOV5_HPP
+
+#include <opencv2/opencv.hpp>
 
 #include <list>
-#include <opencv2/opencv.hpp>
-#include <openvino/openvino.hpp>
+#include <memory>
 #include <string>
 #include <vector>
 
-#include "tasks/auto_aim/armor.hpp"
-#include "tasks/auto_aim/detector.hpp"
 #include "tasks/auto_aim/yolo.hpp"
+#include "tasks/auto_aim/yolos/trt_engine.hpp"
 
 namespace auto_aim
 {
+
 class YOLOV5 : public YOLOBase
 {
 public:
-  YOLOV5(const std::string & config_path, bool debug);
+  YOLOV5(const std::string & config_path, bool debug = false);
 
-  std::list<Armor> detect(const cv::Mat & bgr_img, int frame_count) override;
+  std::list<Armor> detect(const cv::Mat & raw_img, int frame_count) override;
 
   std::list<Armor> postprocess(
     double scale, cv::Mat & output, const cv::Mat & bgr_img, int frame_count) override;
 
 private:
-  std::string device_, model_path_;
-  std::string save_path_, debug_path_;
-  bool debug_, use_roi_, use_traditional_;
+  void decode(
+    double scale, const float * output_data, int num_proposals,
+    std::vector<int> & ids, std::vector<float> & confidences,
+    std::vector<cv::Rect> & boxes,
+    std::vector<std::vector<cv::Point2f>> & armors_key_points);
 
-  const int class_num_ = 13;
-  const float nms_threshold_ = 0.3;
-  const float score_threshold_ = 0.7;
-  double min_confidence_, binary_threshold_;
+  std::list<Armor> parse(
+    double scale, const cv::Mat & output, const cv::Mat & bgr_img, int frame_count);
 
-  ov::Core core_;
-  ov::CompiledModel compiled_model_;
+  static void sort_keypoints(std::vector<cv::Point2f> & keypoints);
+  void draw_detections(
+    const cv::Mat & img, const std::list<Armor> & armors, int frame_count) const;
 
+  bool debug_;
+
+  // TensorRT 引擎
+  std::unique_ptr<TrtEngine> engine_;
+  int output_numel_ = 0;  // 输出 tensor 的总元素数
+
+  // 模型参数
+  static constexpr int input_size_ = 640;
+  double min_confidence_ = 0.0;
+
+  // --- 预处理 buffer（复用避免每帧分配） ---
+  cv::Mat padded_input_;
+  std::vector<float> float_input_;
+  std::vector<float> float_output_;
+
+  // ROI
+  bool use_roi_;
   cv::Rect roi_;
   cv::Point2f offset_;
-  cv::Mat tmp_img_;
-
-  Detector detector_;
-  friend class MultiThreadDetector;
-
-  bool check_name(const Armor & armor) const;
-  bool check_type(const Armor & armor) const;
-
-  cv::Point2f get_center_norm(const cv::Mat & bgr_img, const cv::Point2f & center) const;
-
-  std::list<Armor> parse(double scale, cv::Mat & output, const cv::Mat & bgr_img, int frame_count);
-
-  void save(const Armor & armor) const;
-  void draw_detections(const cv::Mat & img, const std::list<Armor> & armors, int frame_count) const;
-  double sigmoid(double x);
 };
 
 }  // namespace auto_aim
 
-#endif  //AUTO_AIM__YOLOV5_HPP
+#endif  // AUTO_AIM__YOLOS__YOLOV5_HPP

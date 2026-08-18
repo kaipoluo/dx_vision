@@ -12,8 +12,9 @@ find_package(Eigen3 REQUIRED)
 find_package(spdlog REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(nlohmann_json REQUIRED)
-set(OpenVINO_DIR "/opt/intel/openvino_2024.6.0/runtime/cmake/")
-find_package(OpenVINO REQUIRED)
+# OpenVINO replaced with TensorRT for Jetson CUDA acceleration
+# set(OpenVINO_DIR "/opt/intel/openvino_2024.6.0/runtime/cmake/")
+# find_package(OpenVINO REQUIRED)
 
 include_directories(${EIGEN3_INCLUDE_DIR})
 include_directories(${OpenCV_INCLUDE_DIRS})
@@ -71,6 +72,7 @@ add_executable(handeye_test tests/handeye_test.cpp)
 add_executable(dm_test tests/dm_test.cpp)
 add_executable(minimum_vision_system tests/minimum_vision_system.cpp)
 add_executable(camera_auto_aim_test tests/camera_auto_aim_test.cpp)
+add_executable(trt_run_once tests/trt_run_once.cpp)
 
 target_link_libraries(auto_aim_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io auto_aim)
 target_link_libraries(auto_buff_test ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_buff tools io)
@@ -88,6 +90,7 @@ target_link_libraries(handeye_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io aut
 target_link_libraries(dm_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io)
 target_link_libraries(minimum_vision_system ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io auto_aim)
 target_link_libraries(camera_auto_aim_test ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io auto_aim)
+target_link_libraries(trt_run_once ${OpenCV_LIBS} fmt::fmt yaml-cpp tools io auto_aim)
 
 add_executable(gimbal_test tests/gimbal_test.cpp)
 target_link_libraries(gimbal_test ${OpenCV_LIBS} fmt::fmt yaml-cpp auto_aim tools io)
