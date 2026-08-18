@@ -187,7 +187,7 @@ bool TrtEngine::infer(const float * input, float * output)
   // D2H
   checkCuda(
     cudaMemcpyAsync(
-      device_output_, output, output_size_, cudaMemcpyDeviceToHost, stream_),
+      output, device_output_, output_size_, cudaMemcpyDeviceToHost, stream_),
     "D2H");
 
   // sync — 确保数据已经拷回

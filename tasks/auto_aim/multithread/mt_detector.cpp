@@ -33,13 +33,13 @@ MultiThreadDetector::MultiThreadDetector(const std::string & config_path, bool d
 void MultiThreadDetector::push(cv::Mat img, std::chrono::steady_clock::time_point t)
 {
   // 只存原始图像 + 时间戳，CPU 预处理和 GPU 推理在 pop() 中同步完成
-  queue_.push({img.clone(), t});
+  queue_.push({img.clone(), t, std::make_shared<InferContext>()});
 }
 
 std::tuple<std::list<Armor>, std::chrono::steady_clock::time_point>
 MultiThreadDetector::pop()
 {
-  auto [img, t] = queue_.pop();
+  auto [img, t, ctx] = queue_.pop();
 
   auto x_scale = static_cast<double>(input_size_) / img.rows;
   auto y_scale = static_cast<double>(input_size_) / img.cols;
@@ -73,7 +73,7 @@ MultiThreadDetector::pop()
   bool ok = engine_->infer(float_input_.data(), float_output.data());
   if (!ok) {
     tools::logger()->error("[MultiThreadDetector] inference failed");
-    return {std::list<Armor>(), t};
+    return std::make_tuple(std::list<Armor>(), t);
   }
 
   // 输出 → cv::Mat → postprocess（复用 yolo_ 的 parse 逻辑）
@@ -81,13 +81,13 @@ MultiThreadDetector::pop()
 
   auto armors = yolo_.postprocess(scale, output, img, 0);
 
-  return {std::move(armors), t};
+  return std::make_tuple(std::move(armors), t);
 }
 
 std::tuple<cv::Mat, std::list<Armor>, std::chrono::steady_clock::time_point>
 MultiThreadDetector::debug_pop()
 {
-  auto [img, t] = queue_.pop();
+  auto [img, t, ctx] = queue_.pop();
 
   auto x_scale = static_cast<double>(input_size_) / img.rows;
   auto y_scale = static_cast<double>(input_size_) / img.cols;
@@ -120,13 +120,13 @@ MultiThreadDetector::debug_pop()
   bool ok = engine_->infer(float_input_.data(), float_output.data());
   if (!ok) {
     tools::logger()->error("[MultiThreadDetector] inference failed");
-    return {img, std::list<Armor>(), t};
+    return std::make_tuple(img, std::list<Armor>(), t);
   }
 
   cv::Mat output(1, output_numel_, CV_32F, float_output.data());
   auto armors = yolo_.postprocess(scale, output, img, 0);
 
-  return {img, std::move(armors), t};
+  return std::make_tuple(img, std::move(armors), t);
 }
 
 }  // namespace multithread

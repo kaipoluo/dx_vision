@@ -106,9 +106,9 @@ void YOLOV5::decode(
   std::vector<cv::Rect> & boxes,
   std::vector<std::vector<cv::Point2f>> & armors_key_points)
 {
-  constexpr int class_num = 9;                         // 类别数（装甲板 id）
-  constexpr int coords_per_row = 4 + class_num + 10;  // xywh + classes + 5 keypoints
-  // 5 keypoints × 2 (xy) = 10
+  constexpr int class_num = 8;                         // 类别数（装甲板 id）
+  constexpr int coords_per_row = 22;                  // = 4 (xywh) + 8 (classes) + 10 (5 keypoints × 2)
+  static_assert(coords_per_row == 4 + class_num + 10, "coords_per_row must match");
 
   for (int r = 0; r < num_proposals; ++r) {
     auto row = output_data + r * coords_per_row;
@@ -156,8 +156,8 @@ void YOLOV5::decode(
 std::list<Armor> YOLOV5::parse(
   double scale, const cv::Mat & output, const cv::Mat & bgr_img, int frame_count)
 {
-  constexpr int class_num = 9;
-  constexpr int coords_per_row = 4 + class_num + 10;
+  constexpr int class_num = 8;
+  constexpr int coords_per_row = 22;  // = 4 (xywh) + 8 (classes) + 10 (5 keypoints × 2)
   int num_proposals = output_numel_ / coords_per_row;
 
   std::vector<int> ids;
@@ -230,7 +230,7 @@ void YOLOV5::draw_detections(
   auto detection = img.clone();
   tools::draw_text(detection, fmt::format("[{}]", frame_count), {10, 30}, {255, 255, 255});
   for (const auto & armor : armors) {
-    auto info = fmt::format("{:.2f} #{}", armor.confidence, armor.id);
+    auto info = fmt::format("{:.2f} #{}", armor.confidence, armor.class_id);
     tools::draw_points(detection, armor.points, {0, 255, 0});
     tools::draw_text(detection, info, armor.center, {0, 255, 0});
   }
