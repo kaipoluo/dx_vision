@@ -6,8 +6,7 @@ cd "$SCRIPT_DIR" || { echo "无法进入脚本目录: $SCRIPT_DIR"; exit 1; }
 
 
 # 配置参数 
-# APP_NAME="standard_mpc"                # standard_mpc
-APP_NAME="auto_aim_debug_mpc"          # auto_aim_debug_mpc
+APP_NAME="auto_aim_debug_mpc"             # 进程名（用于 pidof 检查）
 APP_PATH="./build/$APP_NAME"           # 应用程序路径
 CONFIG_FILE="./configs/standard3.yaml"  # 配置文件路径
 MAX_RETRY=100                          # 最大重试次数

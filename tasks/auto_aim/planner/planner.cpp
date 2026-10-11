@@ -20,11 +20,12 @@ Planner::Planner(const std::string & config_path)
   pitch_offset_ = tools::read<double>(yaml, "pitch_offset") / 57.3;
   
   // 读取距离相关的偏移量配置
-  auto offset_list = tools::read<std::vector<std::vector<double>>>(yaml, "distance_offsets");
-  for (const auto & offset : offset_list) {
-    if (offset.size() == 3) {
-      // 转换pitch偏移量为弧度
-      distance_offsets_.emplace_back(offset[0], offset[1] / 57.3, offset[2] / 57.3);
+  if (yaml["distance_offsets"]) {
+    auto offset_list = tools::read<std::vector<std::vector<double>>>(yaml, "distance_offsets");
+    for (const auto & offset : offset_list) {
+      if (offset.size() == 3) {
+        distance_offsets_.emplace_back(offset[0], offset[1] / 57.3, offset[2] / 57.3);
+      }
     }
   }
   
@@ -47,7 +48,7 @@ Plan Planner::plan(Target target, double bullet_speed)
 
   // 1. Predict fly_time
   Eigen::Vector3d xyz;
-  auto min_dist = 1e10;
+  auto min_dist = 1e10;//初始化最小距离为一个很大的数，确保在后续比较中能够找到实际的最小距离
   for (auto & xyza : target.armor_xyza_list()) {
     auto dist = xyza.head<2>().norm();
     if (dist < min_dist) {
@@ -66,6 +67,7 @@ Plan Planner::plan(Target target, double bullet_speed)
     traj = get_trajectory(target, yaw0, bullet_speed);
   } catch (const std::exception & e) {
     tools::logger()->warn("Unsolvable target {:.2f}", bullet_speed);
+    debug_fire_deviation = 0.0;
     return {false};
   }
 
@@ -99,17 +101,18 @@ Plan Planner::plan(Target target, double bullet_speed)
   plan.pitch_acc = pitch_solver_->work->u(0, HALF_HORIZON);
 
   auto shoot_offset_ = 2;
-  plan.fire =
-    std::hypot(
-      traj(0, HALF_HORIZON + shoot_offset_) - yaw_solver_->work->x(0, HALF_HORIZON + shoot_offset_),
-      traj(2, HALF_HORIZON + shoot_offset_) -
-        pitch_solver_->work->x(0, HALF_HORIZON + shoot_offset_)) < fire_thresh_;
+  debug_fire_deviation = std::hypot(
+    traj(0, HALF_HORIZON + shoot_offset_) - yaw_solver_->work->x(0, HALF_HORIZON + shoot_offset_),
+    traj(2, HALF_HORIZON + shoot_offset_) -
+      pitch_solver_->work->x(0, HALF_HORIZON + shoot_offset_));
+  double adaptive_thresh = fire_thresh_ + min_dist * 0.012;
+  plan.fire = debug_fire_deviation < adaptive_thresh;
   return plan;
 }
 
 Plan Planner::plan(std::optional<Target> target, double bullet_speed)
 {
-  if (!target.has_value()) return {false}; //c++聚合初始化,plan的数据字段均为false或0
+  if (!target.has_value()) { debug_fire_deviation = 0.0; return {false}; }
 
   double delay_time =
     std::abs(target->ekf_x()[7]) > decision_speed_ ? high_speed_delay_time_ : low_speed_delay_time_;
@@ -141,7 +144,7 @@ void Planner::setup_yaw_solver(const std::string & config_path)
   Eigen::MatrixXd u_max = Eigen::MatrixXd::Constant(1, HORIZON - 1, max_yaw_acc);
   tiny_set_bound_constraints(yaw_solver_, x_min, x_max, u_min, u_max);
 
-  yaw_solver_->settings->max_iter = 10;
+  yaw_solver_->settings->max_iter = 50;
 }
 
 void Planner::setup_pitch_solver(const std::string & config_path)
@@ -164,14 +167,14 @@ void Planner::setup_pitch_solver(const std::string & config_path)
   Eigen::MatrixXd u_max = Eigen::MatrixXd::Constant(1, HORIZON - 1, max_pitch_acc);
   tiny_set_bound_constraints(pitch_solver_, x_min, x_max, u_min, u_max);
 
-  pitch_solver_->settings->max_iter = 10;
+  pitch_solver_->settings->max_iter = 50;
 }
 
 Eigen::Matrix<double, 2, 1> Planner::aim(const Target & target, double bullet_speed)
 {
   Eigen::Vector3d xyz;
   double yaw;
-  auto min_dist = 1e10;
+  auto min_dist = 1e10;//初始化最小距离为一个很大的数，确保在后续比较中能够找到实际的最小距离
 
   for (auto & xyza : target.armor_xyza_list()) {
     auto dist = xyza.head<2>().norm();
@@ -223,39 +226,37 @@ Trajectory Planner::get_trajectory(Target & target, double yaw0, double bullet_s
 std::pair<double, double> Planner::get_offset_by_distance(double distance)
 {
   if (distance_offsets_.empty()) {
-    // 如果没有距离相关的偏移量配置，使用配置文件中的基础偏移量
     return {yaw_offset_, pitch_offset_};
   }
-  
-  // 如果距离小于最小配置距离，返回最小距离的偏移量
+
+  double dist_yaw, dist_pitch;
+
   if (distance <= std::get<0>(distance_offsets_.front())) {
-    return {std::get<1>(distance_offsets_.front()), std::get<2>(distance_offsets_.front())};
-  }
-  
-  // 如果距离大于最大配置距离，返回最大距离的偏移量
-  if (distance >= std::get<0>(distance_offsets_.back())) {
-    return {std::get<1>(distance_offsets_.back()), std::get<2>(distance_offsets_.back())};
-  }
-  
-  // 在配置的距离区间内进行线性插值
-  for (size_t i = 0; i < distance_offsets_.size() - 1; ++i) {
-    double dist1 = std::get<0>(distance_offsets_[i]);
-    double yaw1 = std::get<1>(distance_offsets_[i]);
-    double pitch1 = std::get<2>(distance_offsets_[i]);
-    
-    double dist2 = std::get<0>(distance_offsets_[i + 1]);
-    double yaw2 = std::get<1>(distance_offsets_[i + 1]);
-    double pitch2 = std::get<2>(distance_offsets_[i + 1]);
-    
-    if (distance >= dist1 && distance <= dist2) {
-      double ratio = (distance - dist1) / (dist2 - dist1);
-      double yaw_offset = yaw1 + ratio * (yaw2 - yaw1);
-      double pitch_offset = pitch1 + ratio * (pitch2 - pitch1);
-      return {yaw_offset, pitch_offset};
+    dist_yaw = std::get<1>(distance_offsets_.front());
+    dist_pitch = std::get<2>(distance_offsets_.front());
+  } else if (distance >= std::get<0>(distance_offsets_.back())) {
+    dist_yaw = std::get<1>(distance_offsets_.back());
+    dist_pitch = std::get<2>(distance_offsets_.back());
+  } else {
+    for (size_t i = 0; i < distance_offsets_.size() - 1; ++i) {
+      double dist1 = std::get<0>(distance_offsets_[i]);
+      double yaw1 = std::get<1>(distance_offsets_[i]);
+      double pitch1 = std::get<2>(distance_offsets_[i]);
+
+      double dist2 = std::get<0>(distance_offsets_[i + 1]);
+      double yaw2 = std::get<1>(distance_offsets_[i + 1]);
+      double pitch2 = std::get<2>(distance_offsets_[i + 1]);
+
+      if (distance >= dist1 && distance <= dist2) {
+        double ratio = (distance - dist1) / (dist2 - dist1);
+        dist_yaw = yaw1 + ratio * (yaw2 - yaw1);
+        dist_pitch = pitch1 + ratio * (pitch2 - pitch1);
+        break;
+      }
     }
   }
-  
-  return {0.0, 0.0}; // 兜底返回
+
+  return {yaw_offset_ + dist_yaw, pitch_offset_ + dist_pitch};
 }
 
 }  // namespace auto_aim

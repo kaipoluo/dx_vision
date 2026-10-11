@@ -63,7 +63,7 @@ void CommandGener::generate_command()
       VisionToGimbal.mode = input->targets_.empty() ? 0 : 2;  //0不控制，2控制且开火
       VisionToGimbal.yaw = command.yaw;
       VisionToGimbal.pitch = -(command.pitch);
-      VisionToGimbal.shoot = fire;
+      VisionToGimbal.shoot = fire; //注意这里控制开火
       VisionToGimbal.is_empty = input->targets_.empty();
 
       

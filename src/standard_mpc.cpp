@@ -52,6 +52,8 @@ int main(int argc, char * argv[])
   std::atomic<io::GimbalMode> mode{io::GimbalMode::IDLE};
   auto last_mode{io::GimbalMode::IDLE};
 
+  std::atomic<bool> tracker_detecting{false};
+
   auto plan_thread = std::thread([&]() {
     auto t0 = std::chrono::steady_clock::now();
     uint16_t last_bullet_count = 0;
@@ -63,12 +65,20 @@ int main(int argc, char * argv[])
         auto plan = planner.plan(target, gs.bullet_speed);
         auto is_empty = target.has_value() ? false : true;
 
+        float send_yaw = plan.yaw;
+        while (send_yaw - gs.yaw > M_PI) send_yaw -= 2 * M_PI;
+        while (send_yaw - gs.yaw < -M_PI) send_yaw += 2 * M_PI;
+
+        float send_pitch = plan.pitch;
+        while (send_pitch - gs.pitch > M_PI) send_pitch -= 2 * M_PI;
+        while (send_pitch - gs.pitch < -M_PI) send_pitch += 2 * M_PI;
+
         gimbal.send(
-          plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
+          plan.control, plan.fire, send_yaw, plan.yaw_vel, plan.yaw_acc, send_pitch, plan.pitch_vel,
           plan.pitch_acc, is_empty);
 
         std::this_thread::sleep_for(10ms);
-      } else
+      } else                                                                                              
         std::this_thread::sleep_for(200ms);
     }
   });
@@ -86,16 +96,17 @@ int main(int argc, char * argv[])
 
     camera.read(img, t);
     auto q = gimbal.q(t);
-    recorder.record(img, q, t);
+    //recorder.record(img, q, t);
     solver.set_R_gimbal2world(q);
 
     /// 自瞄
     if (mode.load() == io::GimbalMode::AUTO_AIM) {
       auto armors = yolo.detect(img);
       auto targets = tracker.track(armors, t,gimbal.state().id);
+      tracker_detecting = (tracker.state() == "detecting");
       if (!targets.empty())
         target_queue.push(targets.front());
-      else
+      else if (targets.empty())
         target_queue.push(std::nullopt);
     }
 

@@ -16,6 +16,8 @@ double limit_rad(double angle);
 Eigen::Vector3d eulers(
   Eigen::Quaterniond q, int axis0, int axis1, int axis2, bool extrinsic = false);
 
+
+  // 欧拉角转四元数，两个eulers之间有关系，一个euler是另一个的逆变换
 // 旋转矩阵转欧拉角
 // x = 0, y = 1, z = 2
 // e.g. 先绕z轴旋转，再绕y轴旋转，最后绕x轴旋转：axis0=2, axis1=1, axis2=0

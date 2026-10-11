@@ -9,22 +9,22 @@ namespace auto_aim
 {
 Target::Target(
   const Armor & armor, std::chrono::steady_clock::time_point t, double radius, int armor_num,
-  Eigen::VectorXd P0_dig)
-: name(armor.name),
-  armor_type(armor.type),
-  jumped(false),
-  last_id(0),
+  Eigen::VectorXd P0_dig)//初始化目标对象
+: name(armor.name),//目标名称
+  armor_type(armor.type),//目标类型
+  jumped(false),//是否跳跃
+  last_id(0), //上一次检测到的目标ID
   update_count_(0),
   armor_num_(armor_num),
-  t_(t),
-  is_switch_(false),
-  is_converged_(false),
-  switch_count_(0)
-{
-  auto r = radius;
-  priority = armor.priority;
-  const Eigen::VectorXd & xyz = armor.xyz_in_world;
-  const Eigen::VectorXd & ypr = armor.ypr_in_world;
+  t_(t),//记录目标的时间戳
+  is_switch_(false),//是否切换
+  is_converged_(false),//是否收敛
+  switch_count_(0)  //切换次数
+  //{
+  auto r = radius;//目标半径
+  priority = armor.priority;//目标优先级
+  const Eigen::VectorXd & xyz = armor.xyz_in_world;//目标在世界坐标系中的位置
+  const Eigen::VectorXd & ypr = armor.ypr_in_world;//目标在世界坐标系中的方向
 
   // 旋转中心的坐标
   auto center_x = xyz[0] + r * std::cos(ypr[0]);
@@ -91,7 +91,7 @@ void Target::predict(double dt)
   };
   // clang-format on
 
-  // Piecewise White Noise Model
+  // Piecewise White Noise Model  分段白噪声模型
   // https://github.com/rlabbe/Kalman-and-Bayesian-Filters-in-Python/blob/master/07-Kalman-Filter-Math.ipynb
   double v1, v2;
   if (name == ArmorName::outpost) {

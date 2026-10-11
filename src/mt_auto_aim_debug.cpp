@@ -102,10 +102,10 @@ int main(int argc, char * argv[])
       
     //tools::draw_point()
     // 绘制当前帧率
-    //auto fps = 1.0 / tools::delta_time(std::chrono::steady_clock::now(), t0);
+    auto fps = 1.0 / tools::delta_time(std::chrono::steady_clock::now(), t0);
     // tools::draw_text(img, fmt::format("FPS: {:.2f}", fps), {10, 120}, {255, 255, 255});
-    //控制台打印帧数
-    //tools::logger()->info("Current FPS: {:.2f}", fps);
+    // 控制台打印帧数
+    tools::logger()->info("Current FPS: {:.2f}", fps);
         //绘制画面中心点
     cv::circle(img, cv::Point(img.cols / 2, img.rows / 2), 5, {255, 0, 0}, -1);
 
@@ -191,7 +191,7 @@ int main(int argc, char * argv[])
     //data["bullet_speed"] = gimbal.state().bullet_speed;  // 使用gimbal的state获取子弹速度
 
    
-    plotter.plot(data);
+   plotter.plot(data);
 
     cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
     cv::imshow("reprojection", img);

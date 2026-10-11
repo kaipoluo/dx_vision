@@ -10,7 +10,7 @@
 
 namespace auto_aim
 {
-constexpr double DT = 0.01;
+constexpr double DT = 0.001;
 constexpr int HALF_HORIZON = 50;
 constexpr int HORIZON = HALF_HORIZON * 2;
 
@@ -34,6 +34,7 @@ class Planner
 {
 public:
   Eigen::Vector4d debug_xyza;
+  double debug_fire_deviation = 0.0;
   Planner(const std::string & config_path);
 
   Plan plan(Target target, double bullet_speed);

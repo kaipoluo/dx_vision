@@ -29,8 +29,8 @@
 # 相机测试
 ### 相机画面测试
     ./build/camera_test configs/camera.yaml -d
-    ./build/camera_test configs/standard1.yaml -d
-    参数说明：
+    
+    参数说明：./build/camera_test configs/standard1.yaml -d
     -c 或 --config-path: 指定相机配置文件的路径\
     -d: 显示视频流\
     -h 或 --help: 显示帮助信息

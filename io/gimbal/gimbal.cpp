@@ -237,4 +237,4 @@ void Gimbal::reconnect()
   }
 }
 
-}  // namespace io
+}  // namespace ios

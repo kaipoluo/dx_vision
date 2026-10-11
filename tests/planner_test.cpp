@@ -45,8 +45,16 @@ int main(int argc, char * argv[])
     auto gs = gimbal.state();
     auto plan = planner.plan(target, gs.bullet_speed);
 
+    float send_yaw = plan.yaw;
+    while (send_yaw - gs.yaw > M_PI) send_yaw -= 2 * M_PI;
+    while (send_yaw - gs.yaw < -M_PI) send_yaw += 2 * M_PI;
+
+    float send_pitch = plan.pitch;
+    while (send_pitch - gs.pitch > M_PI) send_pitch -= 2 * M_PI;
+    while (send_pitch - gs.pitch < -M_PI) send_pitch += 2 * M_PI;
+
     gimbal.send(
-      plan.control, plan.fire, plan.yaw, plan.yaw_vel, plan.yaw_acc, plan.pitch, plan.pitch_vel,
+      plan.control, plan.fire, send_yaw, plan.yaw_vel, plan.yaw_acc, send_pitch, plan.pitch_vel,
       plan.pitch_acc);
 
     nlohmann::json data;
@@ -60,7 +68,7 @@ int main(int argc, char * argv[])
     data["target_yaw"] = plan.target_yaw;
     data["target_pitch"] = plan.target_pitch;
 
-    data["plan_yaw"] = plan.yaw;
+    data["plan_yaw"] = send_yaw;
     data["plan_yaw_vel"] = plan.yaw_vel;
     data["plan_yaw_acc"] = plan.yaw_acc;
 

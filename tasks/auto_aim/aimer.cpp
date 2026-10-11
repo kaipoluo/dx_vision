@@ -17,7 +17,7 @@ Aimer::Aimer(const std::string & config_path)
   auto yaml = YAML::LoadFile(config_path);
   yaw_offset_ = yaml["yaw_offset"].as<double>() / 57.3;        // degree to rad
   pitch_offset_ = yaml["pitch_offset"].as<double>() / 57.3;    // degree to rad
-  comming_angle_ = yaml["comming_angle"].as<double>() / 57.3;  // degree to rad
+  comming_angle_ = yaml["comming_angle"].as<double>() / 57.3;  // degree to rad 
   leaving_angle_ = yaml["leaving_angle"].as<double>() / 57.3;  // degree to rad
   high_speed_delay_time_ = yaml["high_speed_delay_time"].as<double>();
   low_speed_delay_time_ = yaml["low_speed_delay_time"].as<double>();
@@ -160,7 +160,7 @@ AimPoint Aimer::choose_aim_point(const Target & target)
   }
 
   // 不考虑小陀螺
-  if (std::abs(target.ekf_x()[8]) <= 2 && target.name != ArmorName::outpost) {
+  if (std::abs(target.ekf_x()[7]) <= 2 && target.name != ArmorName::outpost) {
     // 选择在可射击范围内的装甲板
     std::vector<int> id_list;
     for (int i = 0; i < armor_num; i++) {
