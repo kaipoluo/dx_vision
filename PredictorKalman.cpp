@@ -25,11 +25,10 @@ PredictorKalman::PredictorKalman() {
     H(0, 0) = 1;
     _Kalman::Matrix_xxd R;
     R(0, 0) = 0.01;
-    for (int i = 1; i < S; i++) {
-        R(i, i) = 100;
-    }
+    R(1, 1) = 100;
+    R(2, 2) = 500;
     _Kalman::Matrix_zzd Q{4};
-    _Kalman::Matrix_x1d init{0, 0};
+    _Kalman::Matrix_x1d init{0, 0, 0};
     kalman = _Kalman(A, H, R, Q, init, 0);
 }
 
@@ -160,6 +159,7 @@ bool PredictorKalman::predict(Detection_pack &data, RobotCmd &send, cv::Mat &im2
     last_speed = state(1, 0);
     double c_yaw = state(0, 0);                                   // current yaw: yaw的滤波值，单位弧度
     double c_speed = state(1, 0) * m_pw.norm();                      // current speed: 角速度转线速度，单位m/s
+    double c_accel = state(2, 0) * m_pw.norm();                      // current accel: 角加速度转线加速度，单位m/s²
 //    std::cout << "c_yaw: " << c_yaw << "c_speed:" << c_speed;
 //    std::cout << "t: " << t << " state(1, 0): " << state(1, 0) << std::endl;
 
@@ -169,7 +169,8 @@ bool PredictorKalman::predict(Detection_pack &data, RobotCmd &send, cv::Mat &im2
 
 //    std::cout << "state: " << state << std::endl;
     double predict_time = m_pw.norm() / robot_status->robot_speed_mps + shoot_delay;           // 预测时间=发射延迟+飞行时间（单位:s）
-    double p_yaw = c_yaw + atan2(predict_time * c_speed, m_pw.norm());     // predict yaw: yaw的预测值，直线位移转为角度，单位弧度
+    double displacement = predict_time * c_speed + 0.5 * c_accel * predict_time * predict_time;
+    double p_yaw = c_yaw + atan2(displacement, m_pw.norm());     // predict yaw: yaw的预测值，直线位移转为角度，单位弧度（含加速度项）
 
     double length = sqrt(m_pw(0, 0) * m_pw(0, 0) + m_pw(1, 0) * m_pw(1, 0));
     Eigen::Vector3d c_pw{length * cos(c_yaw), length * sin(c_yaw), m_pw(2, 0)};//反解位置(世界坐标系)
