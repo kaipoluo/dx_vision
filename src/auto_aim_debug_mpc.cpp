@@ -53,6 +53,11 @@ int main(int argc, char * argv[])
   //atomic库：C++13中引入的库，用于线程安全的原子操作。这里使用std::atomic<bool>来表示一个布尔值，用于控制是否退出线程。
   std::atomic<bool> quit = false;
   std::atomic<bool> tracker_detecting{false};
+
+  // ---- 延迟测量：主循环写，规划线程读 ----
+  std::atomic<double> frame_ms{0}, detect_ms{0}, track_ms{0}, draw_ms{0}, plan_ms{0};
+  std::atomic<long long> img_ns{0};  // 当前这张图的采集时刻（ns）
+
   auto plan_thread = std::thread([&]() {
     auto t0 = std::chrono::steady_clock::now();//chrono库：C++11中引入的库，用于处理时间和日期。这里使用std::chrono::steady_clock来获取当前时间点。
 //steady_clock是一种单调时钟，适合用于测量时间间隔。std::chrono::steady_clock::now()返回一个表示当前时间点的对象。
@@ -62,7 +67,9 @@ int main(int argc, char * argv[])
 while (!quit) {
       auto target = target_queue.front();//从队列中获取目标对象
       auto gs = gimbal.state(); //获取云台状态
+      auto t_plan0 = std::chrono::steady_clock::now();
       auto plan = planner.plan(target, gs.bullet_speed);
+      plan_ms = tools::delta_time(std::chrono::steady_clock::now(), t_plan0) * 1000.0;
       auto is_empty = target.has_value() ? false : true;
 
       float send_yaw = plan.yaw;
@@ -78,6 +85,14 @@ while (!quit) {
       gimbal.send(
         plan.control, plan.fire, send_yaw, plan.yaw_vel, plan.yaw_acc, send_pitch, plan.pitch_vel,
         plan.pitch_acc, is_empty);
+
+      // ---- 延迟：从"这张图被采集"到"命令从串口发出" ----
+      auto now = std::chrono::steady_clock::now();
+      double latency_ms = 0;
+      if (img_ns.load() > 0) {
+        auto t_img = std::chrono::steady_clock::time_point(std::chrono::nanoseconds(img_ns.load()));
+        latency_ms = tools::delta_time(now, t_img) * 1000.0;
+      }
 
       nlohmann::json data; //创建一个JSON对象，用于存储数据
       data["t"] = tools::delta_time(std::chrono::steady_clock::now(), t0); //delta_time函数：计算两个时间点之间的时间间隔 
@@ -129,8 +144,17 @@ while (!quit) {
       data["diff_yaw"] = diff_yaw;
       data["diff_pitch"] = diff_pitch;
       data["distance"] = target.has_value() ? std::hypot(target->ekf_x()[0], target->ekf_x()[2]) : 0.0; //hypot函数：计算两个数的平方和的平方根，这里用于计算目标在世界坐标系中的水平距离（x轴和z轴的平方和的平方根）
-      
+
       plotter.plot(data);
+
+      static int print_cnt = 0;
+      if (++print_cnt % 30 == 0) {
+        tools::logger()->info(
+          "[latency] 图像->发出 {:.1f} ms | 帧间隔 {:.1f} ms | 识别 {:.1f} ms | 跟踪 {:.1f} ms | "
+          "画图 {:.1f} ms | 规划 {:.1f} ms",
+          latency_ms, frame_ms.load(), detect_ms.load(), track_ms.load(), draw_ms.load(),
+          plan_ms.load());
+      }
 
       std::this_thread::sleep_for(10ms);
     }
@@ -144,13 +168,25 @@ while (!quit) {
   double fps = 0.0;
   auto fps_start_time = std::chrono::steady_clock::now();
 
+  auto last_read_t = std::chrono::steady_clock::now();
   while (!exiter.exit()) {
     camera.read(img, t);
+    auto t_read = std::chrono::steady_clock::now();
+    frame_ms = tools::delta_time(t_read, last_read_t) * 1000.0;
+    last_read_t = t_read;
+    img_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(t.time_since_epoch()).count();
+
     auto q = gimbal.q(t);
 
     solver.set_R_gimbal2world(q);//设置从云台坐标系到世界坐标系的旋转矩阵
+    auto t_detect0 = std::chrono::steady_clock::now();
     auto armors = yolo.detect(img);//使用YOLO模型检测图像中的装甲板，返回一个装甲板列表
+    auto t_detect1 = std::chrono::steady_clock::now();
     auto targets = tracker.track(armors, t,gimbal.state().id);//使用跟踪器对检测到的装甲板进行跟踪，返回一个目标列表
+    auto t_track1 = std::chrono::steady_clock::now();
+    detect_ms = tools::delta_time(t_detect1, t_detect0) * 1000.0;
+    track_ms = tools::delta_time(t_track1, t_detect1) * 1000.0;
+    auto t_draw0 = std::chrono::steady_clock::now();
     tracker_detecting = (tracker.state() == "detecting");//更新跟踪器状态，判断是否处于检测状态
     if (!targets.empty())
       target_queue.push(targets.front());
@@ -193,6 +229,7 @@ while (!quit) {
     cv::resize(img, img, {}, 0.5, 0.5);  // 显示时缩小图片尺寸
     cv::imshow("reprojection", img);
     auto key = cv::waitKey(1);
+    draw_ms = tools::delta_time(std::chrono::steady_clock::now(), t_draw0) * 1000.0;
     if (key == 'q') break;
   }
 

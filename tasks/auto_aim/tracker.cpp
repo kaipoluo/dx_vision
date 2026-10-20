@@ -301,7 +301,11 @@ bool Tracker::update_target(std::list<Armor> & armors, std::chrono::steady_clock
 bool Tracker::set_enemy_color(int id){
   //红方:1-11 蓝方:101-111
   if ((id < 1 || id > 11) && (id < 101 || id > 111)) {
-    tools::logger()->warn("[Tracker] Invalid ID {}. Using enemy color from config file.", id);
+    static int last_warned_id = -1;
+    if (id != last_warned_id) {  // 只在 ID 变化时警告一次，避免刷屏
+      tools::logger()->warn("[Tracker] Invalid ID {}. Using enemy color from config file.", id);
+      last_warned_id = id;
+    }
     return false; // 无效的id
   }
   if(id<100){

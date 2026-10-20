@@ -87,7 +87,8 @@ void HikRobot::capture_start()
   set_enum_value("GainAuto", MV_GAIN_MODE_OFF);
   set_float_value("ExposureTime", exposure_us_);
   set_float_value("Gain", gain_);
-  MV_CC_SetFrameRate(handle_, 150);
+  MV_CC_SetFrameRate(handle_, 60);  // 相机帧率：消费端(识别+显示)大约 30~40 帧，
+                                    // 设 150 会让捕获线程白做 100 多帧的 Bayer->RGB，抢 CPU
 
   ret = MV_CC_StartGrabbing(handle_);
   if (ret != MV_OK) {

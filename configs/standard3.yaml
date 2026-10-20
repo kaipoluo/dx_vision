@@ -38,26 +38,27 @@ max_temp_lost_count: 15
 outpost_max_temp_lost_count: 75
 
 #####-----aimer参数-----#####
-yaw_offset: -3 # -0.5(能用) 左移调大 degree -2.5 +  left     - right -2.4   -0.75
-pitch_offset: -9 # 4.5（能用）上移调大 deg  （原）ree 2 正值：瞄准点向down偏移 负值：瞄准点向up偏移  -2.5
+yaw_offset: 0 # -0.5(能用) 左移调大 degree -2.5 +  left     - right -2.4   -0.75
+pitch_offset: 0 # 4.5（能用）上移调大 deg  （原）ree 2 正值：瞄准点向down偏移 负值：瞄准点向up偏移  -2.5
 
 # 距离相关的偏移量补偿，格式为：[[距离1, yaw偏移1, pitch偏移1], [距离2, yaw偏移2, pitch偏移2], ...]
 # 偏移量单位：度(若注释掉，则不使用距离补偿，直接使用aimer原偏移量)
 distance_offsets:
-  - [0.5,  -1,   -6]    # 0.5m: yaw左偏1°, pitch上抬6°
-  - [1,    -1.5, -7]    # 1m:   yaw左偏1.5°, pitch上抬7°
-  - [1.5,  -2,   -8]    # 1.5m: yaw左偏2°, pitch上抬8°
-  - [2,    -2.5, -9]    # 2m:   yaw左偏2.5°, pitch上抬9°
-  - [2.5,  -3,  -10]    # 2.5m: yaw左偏3°, pitch上抬10°
+  - [0,  0,   0]    # 0.5m: yaw左偏1°, pitch上抬6°
+  - [0,  0,   0]    # 1m:   yaw左偏1.5°, pitch上抬7°
+  - [0,  0,  0]    # 1.5m: yaw左偏2°, pitch上抬8°
+  - [0,  0,  0]    # 2m:   yaw左偏2.5°, pitch上抬9°
+  - [0,  0,  0]    # 2.5m: yaw左偏3°, pitch上抬10°
 # 小陀螺补偿参数
 xtl_yaw_compensation: 0.05   # yaw补偿量
 xtl_pitch_compensation: 0.02 # pitch补偿量
 
 comming_angle: 60 # degree
 leaving_angle: 20 # degree
-decision_speed: 8 # rad/s
-high_speed_delay_time: 0.315 # s
-low_speed_delay_time: 0.010 # s 0.350
+decision_speed: 8 # rad/s  目标自转角速度超过它，就认为在"小陀螺"，改用下面的大延迟
+high_speed_delay_time: 0.315 # s  小陀螺时的预测时间（相机+识别+发弹延迟的总和）
+low_speed_delay_time: 0.010 # s  普通目标时的预测时间。调大=更超前，调小=更落后。
+                            #   真实值 ≈ 从"曝光"到"云台动"的全部耗时（实测约 0.04~0.07 s）
 
 #####-----shooter参数-----#####
 first_tolerance: 2 # 近距离射击容差，degree
@@ -98,10 +99,13 @@ bytesize: 8             # 数据位
 parity: "none"          # 奇偶校验（none/odd/even）
 stopbits: 1             # 停止位
 
-#####-----planner-----#####
+#####-----planner(MPC)-----#####
+# Q = 跟踪误差的代价，R = 用力的代价。Q/R 越大 → MPC 越"凶"，越小 → 越"软"。
+# R_yaw 越大越平顺但越迟钝；max_yaw_acc 是规划允许的最大角加速度(rad/s^2)。
 fire_thresh: 0.05
-Q_yaw: [9e6, 0]
-R_yaw: [200]
+max_yaw_acc: 30
+Q_yaw: [9e6, 100]   # 第1项=位置误差权重，第2项=角速度误差权重
+R_yaw: [200]        # 用力代价：调小 → 跟得紧但容易抖；调大 → 平顺但滞后
 
 max_pitch_acc: 50   #控制
 Q_pitch: [9e6,100] #响应精度
