@@ -20,7 +20,7 @@ Target::Target(
   is_switch_(false),//是否切换
   is_converged_(false),//是否收敛
   switch_count_(0)  //切换次数
-  //{
+{
   auto r = radius;//目标半径
   priority = armor.priority;//目标优先级
   const Eigen::VectorXd & xyz = armor.xyz_in_world;//目标在世界坐标系中的位置

@@ -31,8 +31,8 @@ Gimbal::Gimbal(const std::string & config_path)
 Gimbal::~Gimbal()
 {
   quit_ = true;
-  if (thread_.joinable()) thread_.join();
   serial_.close();
+  if (thread_.joinable()) thread_.join();
 }
 
 GimbalMode Gimbal::mode() const
