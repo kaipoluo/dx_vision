@@ -62,7 +62,7 @@ int main(int argc, char * argv[])
       if (!target_queue.empty() && mode == io::GimbalMode::AUTO_AIM) {
         auto target = target_queue.front();
         auto gs = gimbal.state();
-        auto plan = planner.plan(target, gs.bullet_speed);
+        auto plan = planner.plan(target, gs.bullet_speed, {gs.yaw, gs.pitch, gs.yaw_vel, true});
         auto is_empty = target.has_value() ? false : true;
 
         float send_yaw = plan.yaw;

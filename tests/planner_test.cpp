@@ -43,7 +43,7 @@ int main(int argc, char * argv[])
     target.predict(0.01);
 
     auto gs = gimbal.state();
-    auto plan = planner.plan(target, gs.bullet_speed);
+    auto plan = planner.plan(target, gs.bullet_speed, {gs.yaw, gs.pitch, gs.yaw_vel, true});
 
     float send_yaw = plan.yaw;
     while (send_yaw - gs.yaw > M_PI) send_yaw -= 2 * M_PI;

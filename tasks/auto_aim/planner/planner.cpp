@@ -30,7 +30,16 @@ Planner::Planner(const std::string & config_path)
   }
   
   // 其他构造函数代码保持不变
-  fire_thresh_ = tools::read<double>(yaml, "fire_thresh");
+  // 开火判定参数：旧配置里没有的键用默认值，避免别的 yaml 起不来
+  auto opt = [&](const char * key, double dflt) {
+    return yaml[key] ? yaml[key].as<double>() : dflt;
+  };
+  fire_thresh_ = opt("fire_thresh", 0.01);  // 允许误差的绝对下限(rad)
+  fire_k_ = opt("fire_k", 1.5);             // 命中系数
+  fire_hysteresis_ = opt("fire_hysteresis", 1.5);
+  fire_min_frames_ = opt("fire_min_frames", 2);
+  fire_yaw_vel_limit_ = opt("fire_yaw_vel_limit", 0.5);
+  fire_pitch_sign_ = opt("fire_pitch_sign", 1.0);
   decision_speed_ = tools::read<double>(yaml, "decision_speed");
   high_speed_delay_time_ = tools::read<double>(yaml, "high_speed_delay_time");
   low_speed_delay_time_ = tools::read<double>(yaml, "low_speed_delay_time");
@@ -39,7 +48,7 @@ Planner::Planner(const std::string & config_path)
   setup_pitch_solver(config_path);
 }
 
-Plan Planner::plan(Target target, double bullet_speed)
+Plan Planner::plan(Target target, double bullet_speed, const GimbalInfo & gimbal)
 {
   // 0. Check bullet speed
   if (bullet_speed < 10 || bullet_speed > 25) {
@@ -68,6 +77,8 @@ Plan Planner::plan(Target target, double bullet_speed)
   } catch (const std::exception & e) {
     tools::logger()->warn("Unsolvable target {:.2f}", bullet_speed);
     debug_fire_deviation = 0.0;
+    firing_ = false;
+    fire_ok_count_ = 0;
     return {false};
   }
 
@@ -105,14 +116,44 @@ Plan Planner::plan(Target target, double bullet_speed)
     traj(0, HALF_HORIZON + shoot_offset_) - yaw_solver_->work->x(0, HALF_HORIZON + shoot_offset_),
     traj(2, HALF_HORIZON + shoot_offset_) -
       pitch_solver_->work->x(0, HALF_HORIZON + shoot_offset_));
-  double adaptive_thresh = fire_thresh_ + min_dist * 0.012;
-  plan.fire = debug_fire_deviation < adaptive_thresh;
+
+  // ---- 开火判定：云台“实际指向” 与 “预测瞄准点” 的夹角 ----
+  // 允许误差 = 装甲板半宽 / 距离（乘命中系数），即目标在画面上有多大，就允许偏多少
+  double half_width = (target.armor_type == ArmorType::big) ? 0.115 : 0.0675;
+  double allow = std::max(fire_k_ * half_width / std::max(min_dist, 0.5), fire_thresh_);
+
+  double aim_err = 1e9;
+  bool vel_ok = false;
+  if (gimbal.valid) {
+    double e_yaw = tools::limit_rad(gimbal.yaw - plan.target_yaw);
+    double e_pitch = fire_pitch_sign_ * (gimbal.pitch - plan.target_pitch);
+    aim_err = std::hypot(e_yaw, e_pitch);
+    vel_ok = std::abs(gimbal.yaw_vel) < fire_yaw_vel_limit_;
+  }
+
+  bool aligned = gimbal.valid && vel_ok && aim_err < allow;
+  if (firing_) {
+    if (!gimbal.valid || !vel_ok || aim_err > allow * fire_hysteresis_) firing_ = false;
+  } else if (aligned) {
+    if (++fire_ok_count_ >= static_cast<int>(fire_min_frames_)) {
+      firing_ = true;
+      fire_ok_count_ = 0;
+    }
+  } else {
+    fire_ok_count_ = 0;
+  }
+  plan.fire = firing_;
   return plan;
 }
 
-Plan Planner::plan(std::optional<Target> target, double bullet_speed)
+Plan Planner::plan(std::optional<Target> target, double bullet_speed, const GimbalInfo & gimbal)
 {
-  if (!target.has_value()) { debug_fire_deviation = 0.0; return {false}; }
+  if (!target.has_value()) {
+    debug_fire_deviation = 0.0;
+    firing_ = false;
+    fire_ok_count_ = 0;
+    return {false};
+  }
 
   double delay_time =
     std::abs(target->ekf_x()[7]) > decision_speed_ ? high_speed_delay_time_ : low_speed_delay_time_;
@@ -121,7 +162,7 @@ Plan Planner::plan(std::optional<Target> target, double bullet_speed)
 
   target->predict(future);
 
-  return plan(*target, bullet_speed);
+  return plan(*target, bullet_speed, gimbal);
 }
 
 void Planner::setup_yaw_solver(const std::string & config_path)

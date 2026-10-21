@@ -68,7 +68,7 @@ while (!quit) {
       auto target = target_queue.front();//从队列中获取目标对象
       auto gs = gimbal.state(); //获取云台状态
       auto t_plan0 = std::chrono::steady_clock::now();
-      auto plan = planner.plan(target, gs.bullet_speed);
+      auto plan = planner.plan(target, gs.bullet_speed, {gs.yaw, gs.pitch, gs.yaw_vel, true});
       plan_ms = tools::delta_time(std::chrono::steady_clock::now(), t_plan0) * 1000.0;
       auto is_empty = target.has_value() ? false : true;
 
